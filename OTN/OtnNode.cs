@@ -22,6 +22,7 @@ public class OtnNode
 {
     private readonly List<AggregationRule> _rules = new List<AggregationRule>();
     private readonly List<OtnSignal> _signals = new List<OtnSignal>();
+    public IReadOnlyList<OtnSignal> Signals => _signals.AsReadOnly();
 
     public OtnNode(IEnumerable<AggregationRule> rules)
     {

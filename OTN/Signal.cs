@@ -41,11 +41,14 @@ public static class SignalToOTN
     public static bool TryToOtnSignal(this Signal signal, OtnLevel oduLevel, [NotNullWhen(true)] out OtnSignal? result)
     {
         result = null;
+        var expected = oduLevel.ExpectedBandwidthGbps();
 
-        if (Math.Abs(signal.BandwidthGbps - oduLevel.ExpectedBandwidthGbps()) > _tolerance)
-            return false; // Bandwidth mismatch
+        // Relaxed bandwidth check: 
+        // signal bandwidth must not exceed container bandwidth + tolerance
+        if (signal.BandwidthGbps > expected + _tolerance)
+            return false;
 
-        result = new OtnSignal(signal.Id, signal.Name, signal.BandwidthGbps, oduLevel);
+        result = new OtnSignal(signal.Id, Enum.GetName(oduLevel)!, expected, oduLevel);
         return true;
     }
 
