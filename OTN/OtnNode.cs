@@ -126,7 +126,7 @@ public class OtnNode
     /// </returns>
     public bool IsAggregationSupportedTransitive(OtnLevel client, OtnLevel container, [NotNullWhen(true)] out OtnLevel? foundIntermediate)
     {
-        foundIntermediate = default;
+        foundIntermediate = null;
 
         if ((int)client >= (int)container)
             return false;
@@ -137,24 +137,21 @@ public class OtnNode
 
     private bool IsAggregationSupportedRecursive(OtnLevel current, OtnLevel target, HashSet<OtnLevel> visited, [NotNullWhen(true)] out OtnLevel? foundIntermediate)
     {
-        foundIntermediate = default;
+        foundIntermediate = null;
 
         if (visited.Contains(current))
             return false;
         visited.Add(current);
 
-        if (_rules.Any(r => r.ClientType == current && r.ContainerType == target))
+        if (IsAggregationSupported(current, target))
         {
             foundIntermediate = target;
             return true;
         }
 
         var nextLevels = _rules.Where(r => r.ClientType == current).Select(r => r.ContainerType);
-        foreach (var next in nextLevels)
+        foreach (var next in nextLevels.OrderDescending())
         {
-            if ((int)next <= (int)current)
-                continue;
-
             if (IsAggregationSupportedRecursive(next, target, visited, out foundIntermediate))
                 return true;
         }
