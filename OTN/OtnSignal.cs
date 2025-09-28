@@ -12,7 +12,7 @@ public class OtnSignal : Signal
 {
     public OtnLevel OduLevel { get; }
 
-    private readonly List<OtnSignal> aggregation = [];
+    private readonly List<OtnSignal> _aggregation = new List<OtnSignal>();
 
     public OtnSignal(Guid id, string name, double bandwidthGbps, OtnLevel oduLevel)
         : base(id, name, bandwidthGbps)
@@ -40,7 +40,7 @@ public class OtnSignal : Signal
         if (Math.Abs(BandwidthGbps - containerExpected) > tolerance)
             return false;
 
-        var currentUsedSlots = aggregation.Sum(c => c.OduLevel.SlotsRequired());
+        var currentUsedSlots = _aggregation.Sum(c => c.OduLevel.SlotsRequired());
         var clientSlots = client.OduLevel.SlotsRequired();
         if (currentUsedSlots + clientSlots > OduLevel.SlotsAvailable())
             return false;
@@ -53,17 +53,17 @@ public class OtnSignal : Signal
     /// </summary>
     /// <param name="client">The client OTN signal to aggregate.</param>
     /// <returns><c>true</c> if aggregation is successful; otherwise, <c>false</c>.</returns>
-    public bool TryAggregateClient(OtnSignal client)
+    public bool TryAggregate(OtnSignal client)
     {
         if (!CanAggregate(client))
             return false;
 
-        aggregation.Add(client);
+        _aggregation.Add(client);
         return true;
     }
 
     public override string ToString()
     {
-        return base.ToString() + $", ODU Level: {OduLevel}, Aggregated Clients: {aggregation.Count}";
+        return base.ToString() + $", ODU Level: {OduLevel}, Aggregated Clients: {_aggregation.Count}";
     }
 }

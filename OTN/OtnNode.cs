@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
@@ -19,12 +20,50 @@ public record AggregationRule(OtnLevel ClientType, OtnLevel ContainerType);
 /// </remarks>
 public class OtnNode
 {
-    private readonly List<AggregationRule> _rules = [];
-    private readonly List<OtnSignal> _signals = [];
+    private readonly List<AggregationRule> _rules = new List<AggregationRule>();
+    private readonly List<OtnSignal> _signals = new List<OtnSignal>();
 
     public OtnNode(IEnumerable<AggregationRule> rules)
     {
-        _rules = [.. rules];
+        _rules = rules.ToList();
+    }
+
+    /// <summary>
+    /// Attempts to add a client OTN signal to this node
+    /// The signal is assigned to the last suitable container signal if possible; otherwise, a new container is created.
+    /// </summary>
+    /// <remarks>
+    /// Effectively it's Next Fit bin packing heuristic.
+    /// </remarks>
+    /// <param name="client">The client OTN signal to add.</param>
+    /// <returns><c>true</c> if the client signal was successfully aggregated; otherwise, <c>false</c>.</returns>
+    public bool TryAggregate(OtnSignal client)
+    {
+        foreach (var containerSignal in _signals.AsEnumerable().Reverse())
+        {
+            // Check node-level aggregation rule first
+            if (!IsAggregationSupported(client.OduLevel, containerSignal.OduLevel))
+                continue;
+
+            if (containerSignal.TryAggregate(client))
+                return true;
+        }
+
+        // Assume we have path to the highest OTN level rule
+        var targetLevel = _rules.Select(r => r.ContainerType).Max();
+        if (!IsAggregationSupportedTransitive(client.OduLevel, targetLevel, out var containerLevel))
+            return false;
+
+        // Create new container signal to hold client
+        var newContainer = new OtnSignal(Guid.NewGuid(), Enum.GetName(containerLevel.Value)!, containerLevel.Value.ExpectedBandwidthGbps(), containerLevel.Value);
+        if (newContainer.TryAggregate(client))
+        {
+            if (!TryAggregate(newContainer))
+                _signals.Add(newContainer);
+            return true;
+        }
+        
+        return false;
     }
 
     /// <summary>
