@@ -15,6 +15,15 @@ namespace OTN;
 public record AggregationRule(OtnLevel ClientType, OtnLevel ContainerType);
 
 /// <summary>
+/// Delegate for selecting a container signal based on a bin packing strategy.
+/// </summary>
+/// <param name="signals">The available container signals.</param>
+/// <param name="client">The client signal to aggregate.</param>
+/// <param name="selectedContainer">When this method returns <c>true</c>, contains the selected container; otherwise, <c>null</c>.</param>
+/// <returns><c>true</c> if a fitting container was found; otherwise, <c>false</c>.</returns>
+public delegate bool AggregationSelector(IEnumerable<OtnSignal> signals, OtnSignal client, [NotNullWhen(true)] out OtnSignal? selectedContainer);
+
+/// <summary>
 /// Represents an OTN node which manages aggregation rules and signals.
 /// </summary>
 /// <remarks>
@@ -30,27 +39,42 @@ public class OtnNode
     {
         _rules = rules.ToList();
     }
-
+    
     /// <summary>
     /// Attempts to add a client OTN signal to this node
     /// The signal is assigned to the last suitable container signal if possible; otherwise, a new container is created.
     /// </summary>
     /// <remarks>
-    /// Effectively it's Next Fit bin packing heuristic.
+    /// Supports multiple bin packing heuristics: NextFit (default), FirstFit, BestFit, WorstFit.
     /// </remarks>
     /// <param name="client">The client OTN signal to add.</param>
+    /// <param name="strategy">The aggregation/bin packing strategy to use. Defaults to NextFit.</param>
     /// <returns><c>true</c> if the client signal was successfully aggregated; otherwise, <c>false</c>.</returns>
-    public bool TryAggregate(OtnSignal client)
+    public bool TryAggregate(OtnSignal client, AggregationStrategy strategy = AggregationStrategy.NextFit)
     {
-        foreach (var containerSignal in _signals.AsEnumerable().Reverse())
+        AggregationSelector selector = strategy switch
         {
-            // Check node-level aggregation rule first
-            if (!IsAggregationSupported(client.OduLevel, containerSignal.OduLevel))
-                continue;
+            AggregationStrategy.NextFit => NextFitSelector,
+            AggregationStrategy.FirstFit => FirstFitSelector,
+            AggregationStrategy.BestFit => BestFitSelector,
+            AggregationStrategy.WorstFit => WorstFitSelector,
+            _ => throw new ArgumentOutOfRangeException(nameof(strategy))
+        };
 
-            if (containerSignal.TryAggregate(client))
-                return true;
-        }
+        return TryAggregate(client, selector);
+    }
+
+    /// <summary>
+    /// Attempts to add a client OTN signal to this node
+    /// The signal is assigned to the last suitable container signal if possible; otherwise, a new container is created.
+    /// </summary>
+    /// <param name="client">The client OTN signal to add.</param>
+    /// <param name="selector">The delegate to select a fitting container.</param>
+    /// <returns><c>true</c> if the client signal was successfully aggregated; otherwise, <c>false</c>.</returns>
+    public bool TryAggregate(OtnSignal client, AggregationSelector selector)
+    {
+        if (selector(_signals, client, out var selectedContainer))
+            return selectedContainer.TryAggregate(client);
 
         // Assume we have path to the highest OTN level rule
         var targetLevel = _rules.Select(r => r.ContainerType).Max();
@@ -61,11 +85,11 @@ public class OtnNode
         var newContainer = new OtnSignal(Guid.NewGuid(), Enum.GetName(containerLevel.Value)!, containerLevel.Value.ExpectedBandwidthGbps(), containerLevel.Value);
         if (newContainer.TryAggregate(client))
         {
-            if (!TryAggregate(newContainer))
+            if (!TryAggregate(newContainer, selector))
                 _signals.Add(newContainer);
             return true;
         }
-        
+
         return false;
     }
 
@@ -135,5 +159,83 @@ public class OtnNode
                 return true;
         }
         return false;
+    }
+
+    private bool NextFitSelector(IEnumerable<OtnSignal> signals, OtnSignal client, [NotNullWhen(true)] out OtnSignal? selectedContainer)
+    {
+        selectedContainer = null;
+        foreach (var container in signals.Reverse())
+        {
+            if (IsAggregationSupported(client.OduLevel, container.OduLevel) && container.CanAggregate(client))
+            {
+                selectedContainer = container;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private bool FirstFitSelector(IEnumerable<OtnSignal> signals, OtnSignal client, [NotNullWhen(true)] out OtnSignal? selectedContainer)
+    {
+        selectedContainer = null;
+        foreach (var container in signals)
+        {
+            if (IsAggregationSupported(client.OduLevel, container.OduLevel) && container.CanAggregate(client))
+            {
+                selectedContainer = container;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private bool BestFitSelector(IEnumerable<OtnSignal> signals, OtnSignal client, [NotNullWhen(true)] out OtnSignal? selectedContainer)
+    {
+        selectedContainer = null;
+        int minRemaining = int.MaxValue;
+
+        foreach (var container in signals)
+        {
+            if (!IsAggregationSupported(client.OduLevel, container.OduLevel) || !container.CanAggregate(client))
+                continue;
+
+            // Calculate the remaining slots if the client were added.
+            int currentUsedSlots = container.Aggregation.Sum(c => c.OduLevel.SlotsRequired());
+            int clientSlots = client.OduLevel.SlotsRequired();
+            int remaining = container.OduLevel.SlotsAvailable() - (currentUsedSlots + clientSlots);
+
+            if (remaining < minRemaining)
+            {
+                selectedContainer = container;
+                minRemaining = remaining;
+            }
+        }
+
+        return selectedContainer != null;
+    }
+
+    private bool WorstFitSelector(IEnumerable<OtnSignal> signals, OtnSignal client, [NotNullWhen(true)] out OtnSignal? selectedContainer)
+    {
+        selectedContainer = null;
+        int maxRemaining = int.MinValue;
+
+        foreach (var container in signals)
+        {
+            if (!IsAggregationSupported(client.OduLevel, container.OduLevel) || !container.CanAggregate(client))
+                continue;
+
+            // Calculate the remaining slots if the client were added.
+            int currentUsedSlots = container.Aggregation.Sum(c => c.OduLevel.SlotsRequired());
+            int clientSlots = client.OduLevel.SlotsRequired();
+            int remaining = container.OduLevel.SlotsAvailable() - (currentUsedSlots + clientSlots);
+
+            if (remaining > maxRemaining)
+            {
+                selectedContainer = container;
+                maxRemaining = remaining;
+            }
+        }
+
+        return selectedContainer != null;
     }
 }

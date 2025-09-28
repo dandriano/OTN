@@ -12,9 +12,9 @@ namespace OTN;
 /// </summary>
 public class OtnSignal : Signal
 {
-    public OtnLevel OduLevel { get; }
-
     private readonly List<OtnSignal> _aggregation = new List<OtnSignal>();
+    public IReadOnlyList<OtnSignal> Aggregation => _aggregation.AsReadOnly(); 
+    public OtnLevel OduLevel { get; }
 
     public OtnSignal(Guid id, string name, double bandwidthGbps, OtnLevel oduLevel)
         : base(id, name, bandwidthGbps)
