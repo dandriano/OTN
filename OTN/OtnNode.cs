@@ -1,21 +1,21 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
 
 namespace OTN;
 
-public record AggregationRule
-{
-    public OtnLevel ClientType { get; }
-    public OtnLevel ContainerType { get; }
+/// <summary>
+/// Represents a rule defining which client OTN level can be aggregated into which container OTN level.
+/// </summary>
+/// <param name="ClientType">The OTN level of the client signal.</param>
+/// <param name="ContainerType">The OTN level of the container signal.</param>
+public record AggregationRule(OtnLevel ClientType, OtnLevel ContainerType);
 
-    public AggregationRule(OtnLevel clientType, OtnLevel containerType)
-    {
-        ClientType = clientType;
-        ContainerType = containerType;
-    }
-}
-
+/// <summary>
+/// Represents an OTN node which manages aggregation rules and signals.
+/// </summary>
+/// <remarks>
+/// This is abstracted from circuit pack/equipment node
+/// </remarks>
 public class OtnNode
 {
     private readonly List<AggregationRule> _rules = [];
@@ -26,6 +26,12 @@ public class OtnNode
         _rules = [.. rules];
     }
 
+    /// <summary>
+    /// Determines whether aggregation is supported for a given client and container OTN level based on the node's rules.
+    /// </summary>
+    /// <param name="client">The client OTN level.</param>
+    /// <param name="container">The container OTN level.</param>
+    /// <returns><c>true</c> if aggregation is supported; otherwise <c>false</c>.</returns>
     public bool IsAggregationSupported(OtnLevel client, OtnLevel container)
     {
         // Strict hierarchy check
@@ -33,38 +39,6 @@ public class OtnNode
             return false;
 
         // Direct rule check
-        if (_rules.Any(r => r.ClientType == client && r.ContainerType == container))
-            return true;
-        return false;
-
-        // Transitive rule check (in reality doesnt needed)
-        /*
-        var visitor = new HashSet<OduLevel>();
-        Func<OduLevel, OduLevel, HashSet<OduLevel>, bool> transitiveRecursiveRuleCheck = null!;
-        transitiveRecursiveRuleCheck = (current, target, visited) =>
-        {
-            if (visited.Contains(current))
-                return false;
-            visited.Add(current);
-
-            foreach (var intermediate in _rules.Where(r => r.ClientType == client)
-                                               .Select(r => r.ContainerType)
-                                               .Distinct())
-            {
-                if ((int)intermediate <= (int)current)
-                    continue;
-
-                if (intermediate == target)
-                    return true;
-
-                if (transitiveRecursiveRuleCheck(intermediate, target, visited))
-                    return true;
-            }
-
-            return false;
-        };
-
-        return transitiveRecursiveRuleCheck(client, container, visitor);
-        */
+        return _rules.Any(r => r.ClientType == client && r.ContainerType == container);
     }
 }

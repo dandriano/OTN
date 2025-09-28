@@ -4,6 +4,10 @@ using System.Linq;
 
 namespace OTN;
 
+/// <summary>
+/// Represents an Optical Transport Network (OTN) signal with a specific OTU/ODU level, 
+/// supporting client signal aggregation.
+/// </summary>
 public class OtnSignal : Signal
 {
     public OtnLevel OduLevel { get; }
@@ -16,6 +20,11 @@ public class OtnSignal : Signal
         OduLevel = oduLevel;
     }
 
+    /// <summary>
+    /// Determines whether a client OTN signal can be aggregated within this container OTN signal.
+    /// </summary>
+    /// <param name="client">The client OTN signal to check for aggregation.</param>
+    /// <returns><c>true</c> if the client can be aggregated; otherwise, <c>false</c>.</returns>
     public bool CanAggregate(OtnSignal client)
     {
         const double tolerance = 0.001;
@@ -39,6 +48,11 @@ public class OtnSignal : Signal
         return true;
     }
 
+    /// <summary>
+    /// Attempts to aggregate a client signal within this OTN signal container.
+    /// </summary>
+    /// <param name="client">The client OTN signal to aggregate.</param>
+    /// <returns><c>true</c> if aggregation is successful; otherwise, <c>false</c>.</returns>
     public bool TryAggregateClient(OtnSignal client)
     {
         if (!CanAggregate(client))

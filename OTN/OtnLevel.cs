@@ -2,6 +2,10 @@ using System;
 
 namespace OTN;
 
+/// <summary>
+/// Enumerates the Optical Transport Network (OTN) levels 
+/// representing various ODU (Optical Data Unit) signal levels.
+/// </summary>
 public enum OtnLevel
 {
     ODU0 = 0,
@@ -11,8 +15,17 @@ public enum OtnLevel
     ODU4 = 4
 }
 
+/// <summary>
+/// Provides extension methods for working with <see cref="OtnLevel"/> enumeration.
+/// </summary>
 public static class OtnLevelProperties
 {
+    /// <summary>
+    /// Gets the number of slots required by the given OTN level.
+    /// </summary>
+    /// <param name="type">The OTN level.</param>
+    /// <returns>The number of slots required.</returns>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when the OTN level is not recognized.</exception>
     public static int SlotsRequired(this OtnLevel type) => type switch
     {
         OtnLevel.ODU0 => 1,
@@ -23,6 +36,11 @@ public static class OtnLevelProperties
         _ => throw new ArgumentOutOfRangeException(nameof(type))
     };
 
+    /// <summary>
+    /// Gets the number of slots available for the given OTN level.
+    /// </summary>
+    /// <param name="type">The OTN level.</param>
+    /// <returns>The number of slots available, or 0 if none are available.</r
     public static int SlotsAvailable(this OtnLevel type) => type switch
     {
         OtnLevel.ODU1 => 2,
@@ -32,6 +50,12 @@ public static class OtnLevelProperties
         _ => 0
     };
 
+    /// <summary>
+    /// Gets the expected bandwidth in Gbps for the given OTN level.
+    /// </summary>
+    /// <param name="type">The OTN level.</param>
+    /// <returns>The expected bandwidth in gigabits per second.</returns>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when the OTN lev
     public static double ExpectedBandwidthGbps(this OtnLevel type) => type switch
     {
         OtnLevel.ODU0 => 1.24416,
@@ -42,6 +66,12 @@ public static class OtnLevelProperties
         _ => throw new ArgumentOutOfRangeException(nameof(type))
     };
 
+    /// <summary>
+    /// Returns a new OTN level offset by a specified amount.
+    /// </summary>
+    /// <param name="level">The current OTN level.</param>
+    /// <param name="offset">The offset to apply (positive or negative).</param>
+    /// <returns>The offset OTN level, bounded to the defined range.</returns>
     public static OtnLevel OffsetLevel(this OtnLevel level, int offset)
     {
         var newValue = (int)level + offset;
@@ -54,6 +84,11 @@ public static class OtnLevelProperties
         return (OtnLevel)newValue;
     }
 
+    /// <summary>
+    /// Returns the next higher OTN level if available.
+    /// </summary>
+    /// <param name="level">The current OTN level.</param>
+    /// <returns>The next OTN level, or the current level if already at maximu
     public static OtnLevel NextLevel(this OtnLevel level)
     {
         return level.OffsetLevel(1);
