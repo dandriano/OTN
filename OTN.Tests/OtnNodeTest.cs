@@ -26,7 +26,7 @@ public class OtnNodeTest
         _fullRuleSet.Add(new AggregationRule(OtnLevel.ODU2, OtnLevel.ODU3));
         _fullRuleSet.Add(new AggregationRule(OtnLevel.ODU0, OtnLevel.ODU2));
         _fullRuleSet.Add(new AggregationRule(OtnLevel.ODU1, OtnLevel.ODU2));
-        
+
         // Ancient baikal rule set
         _baikalRuleSet.Add(new AggregationRule(OtnLevel.ODU0, OtnLevel.ODU2));
         _baikalRuleSet.Add(new AggregationRule(OtnLevel.ODU1, OtnLevel.ODU2));
@@ -54,31 +54,24 @@ public class OtnNodeTest
             Assert.That(!baikalNode.IsAggregationSupported(OtnLevel.ODU0, OtnLevel.ODU4));
             Assert.That(fullNode.IsAggregationSupported(OtnLevel.ODU0, OtnLevel.ODU4));
         });
-
-        // Transitive check thru OTNv3 rule set
-        var currentLevel = OtnLevel.ODU0;
-        var targetLevel = OtnLevel.ODU4;
-        
-        var hops = 0;
-        while (currentLevel != targetLevel)
-        {
-            Assert.That(fullNode.IsAggregationSupportedTransitive(currentLevel, targetLevel, out var intermediate));
-            currentLevel = intermediate!.Value;
-            hops++;
-        }
-
-        Assert.That(currentLevel, Is.EqualTo(targetLevel));
-        // Since transitive check produce direct check before going recursive
-        // and the OTNv3 rule set permits direct aggregation ODU0 -> ODU4
-        Assert.That(hops, Is.EqualTo(1));
     }
 
     [Test]
     public void ClientAggregationTest()
     {
+        var fullNode = new OtnNode(_fullRuleSet);
+        // Check for direct aggregation
+        Assert.Multiple(() =>
+        {
+            Assert.That(fullNode.TryAggregate(_clientFactory[0]().ToOtnSignal()));
+            Assert.That(fullNode.Signals.Single().OduLevel, Is.EqualTo(OtnLevel.ODU4));
+            Assert.That(fullNode.Signals.Single().Aggregation.Single().OduLevel, Is.EqualTo(OtnLevel.ODU0));
+        });
+
+
+        // Check for random agregation
         var rnd = new Random();
-        var capacity = 5;
-        var clients = Enumerable.Range(0, capacity)
+        var clients = Enumerable.Range(0, 5)
                                 .Select(i => _clientFactory[rnd.Next(_clientFactory.Count - 1)]())
                                 .ToList();
 
@@ -93,7 +86,78 @@ public class OtnNodeTest
         }
 
         Assert.That(baikalNode.Signals, Is.Not.Empty);
-        Assert.That(baikalNode.Signals, Has.Count.LessThan(capacity));
-        Assert.That(baikalNode.Signals.All(s => s.OduLevel == baikalNode.Signals[0].OduLevel));
+        Assert.That(baikalNode.Signals, Has.Count.EqualTo(1));  // in OTN Node capacity by default
+
+        // Let's "fill" a remainning space of the OTN signal with aggregation
+        // of STM-1
+        while (baikalNode.Signals.Single().TryAggregate(_clientFactory[2]().ToOtnSignal()))
+            continue;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(baikalNode.Signals, Has.Count.EqualTo(1));  // in OTN Node capacity by default
+            Assert.That(!baikalNode.Signals.Single().TryAggregate(_clientFactory[rnd.Next(_clientFactory.Count - 1)]().ToOtnSignal()));
+        });
+
+        // Ok, let's assume that baikal could aggregate up to ODU4/100G
+        var nonExistentBaikalRuleSet = _baikalRuleSet.ToList();
+        nonExistentBaikalRuleSet.Add(new AggregationRule(OtnLevel.ODU2, OtnLevel.ODU4));
+
+        // Check transitive aggregation, where's no direct path
+        var nonExistentBaikal = new OtnNode(nonExistentBaikalRuleSet);
+        Assert.Multiple(() =>
+        {
+            Assert.That(nonExistentBaikal.TryAggregate(_clientFactory[0]().ToOtnSignal()));
+            Assert.That(nonExistentBaikal.Signals.Single().OduLevel, Is.EqualTo(OtnLevel.ODU4));
+            Assert.That(nonExistentBaikal.Signals.Single().Aggregation.Single().OduLevel, Is.EqualTo(OtnLevel.ODU2));
+            Assert.That(nonExistentBaikal.Signals.Single().Aggregation.Single().Aggregation.Single().OduLevel, Is.EqualTo(OtnLevel.ODU0));
+        });
+    }
+
+    [Test]
+    public void CreateInvalidOtnNodeTest()
+    {
+        // Two "head" rule
+        var invalidRules = new List<AggregationRule>()
+        {
+            new AggregationRule(OtnLevel.ODU0, OtnLevel.ODU2),
+            new AggregationRule(OtnLevel.ODU0, OtnLevel.ODU4)
+        };
+
+        Assert.Throws<InvalidOperationException>(() =>
+        {
+            var otn = new OtnNode(invalidRules);
+        });
+
+        // Stupid, but...
+        var stupidButOkRule = new List<AggregationRule>()
+        {
+            new AggregationRule(OtnLevel.ODU0, OtnLevel.ODU2),
+            new AggregationRule(OtnLevel.ODU0, OtnLevel.ODU4),
+            new AggregationRule(OtnLevel.ODU2, OtnLevel.ODU4),
+        };
+
+        Assert.DoesNotThrow(() =>
+        {
+            var otn = new OtnNode(stupidButOkRule);
+        });
+    }
+
+    [Test]
+    public void CpacityOtnNodeTest()
+    {
+        // Line 1xODU2 OTN Node
+        var baikalNode = new OtnNode(_baikalRuleSet);
+
+        // 4xGE + 4xSTM-1
+        for (int i = 0; i < 8; i++)
+        {
+            // GE or STM-1
+            var id = i % 2 == 0 ? 0 : 2;
+            Assert.That(baikalNode.TryAggregate(_clientFactory[id]().ToOtnSignal()));
+        }
+
+        // No more
+        Assert.That(!baikalNode.TryAggregate(_clientFactory[0]().ToOtnSignal()));
     }
 }

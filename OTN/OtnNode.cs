@@ -32,12 +32,44 @@ public delegate bool AggregationSelector(IEnumerable<OtnSignal> signals, OtnSign
 public class OtnNode
 {
     private readonly List<AggregationRule> _rules = new List<AggregationRule>();
-    private readonly List<OtnSignal> _signals = new List<OtnSignal>();
+    private readonly List<OtnSignal> _signals;
     public IReadOnlyList<OtnSignal> Signals => _signals.AsReadOnly();
 
-    public OtnNode(IEnumerable<AggregationRule> rules)
+    /// <summary>
+    /// Initializes a new instance of the <see cref="OtnNode"/> class 
+    /// with aggregation rules and optional initial capacity.
+    /// </summary>
+    /// <param name="rules">The aggregation rules defining allowed client-to-container aggregations.</param>
+    /// <param name="capacity">Initial capacity to allocate for storing HO OTN signals.</param>
+    /// <exception cref="InvalidOperationException">Thrown if the rules do not support transitive aggregation up to the maximum container level.</exception>
+    /// <remarks>
+    /// Validates aggregation rules upon initialization to ensure 
+    /// transitive aggregation support up to the highest container level.
+    /// </remarks>
+    public OtnNode(IEnumerable<AggregationRule> rules, int capacity = 1)
     {
         _rules = rules.ToList();
+
+        // Validate rules upfront and populate cache
+        var maxRule = _rules.MaxBy(r => r.ContainerType)?.ContainerType
+            ?? throw new InvalidOperationException("There's no rules");
+
+        foreach (var rule in _rules.Select(r => r.ClientType)
+                                   .Distinct())
+        {
+            if (!IsAggregationSupportedTransitive(rule, maxRule, out _))
+                throw new InvalidOperationException("Invalid rules");
+        }
+
+        foreach (var rule in _rules.Where(r => r.ContainerType != maxRule)
+                                   .Select(r => r.ContainerType)
+                                   .Distinct())
+        {
+            if (!IsAggregationSupportedTransitive(rule, maxRule, out _))
+                throw new InvalidOperationException("Invalid rules");
+        }
+
+        _signals = new List<OtnSignal>(capacity);
     }
     
     /// <summary>
@@ -82,12 +114,18 @@ public class OtnNode
             return false;
 
         // Create new container signal to hold client
-        var newContainer = new OtnSignal(Guid.NewGuid(), Enum.GetName(containerLevel.Value)!, containerLevel.Value.ExpectedBandwidthGbps(), containerLevel.Value);
+        var newContainer = new OtnSignal(Guid.NewGuid(), Enum.GetName(containerLevel!.Value)!, containerLevel.Value.ExpectedBandwidthGbps(), containerLevel.Value);
         if (newContainer.TryAggregate(client))
         {
-            if (!TryAggregate(newContainer, selector))
+            if (TryAggregate(newContainer, selector))
+            {
+                return true;
+            }
+            else if (_signals.Capacity > _signals.Count)
+            {
                 _signals.Add(newContainer);
-            return true;
+                return true;
+            }
         }
 
         return false;
@@ -115,29 +153,30 @@ public class OtnNode
     /// </summary>
     /// <param name="client">The OTN level of the client signal.</param>
     /// <param name="container">The OTN level of the container signal.</param>
-    /// <param name="foundIntermediate">
-    /// When this method returns, contains the intermediate OTN level found 
-    /// during the transitive aggregation check that supports the aggregation. 
+    /// <param name="foundNextHop">
+    /// When this method returns, contains the intermediate (next hop) OTN level found 
+    /// during the transitive aggregation check that supports the aggregation 
+    /// (so not so efficient, think about cache or something). 
     /// This will be default if no such level is found.
     /// </param>
     /// <returns>
     /// <c>true</c> if aggregation is supported either directly or 
     /// through one or more intermediate levels; otherwise, <c>false</c>.
     /// </returns>
-    public bool IsAggregationSupportedTransitive(OtnLevel client, OtnLevel container, [NotNullWhen(true)] out OtnLevel? foundIntermediate)
+    public bool IsAggregationSupportedTransitive(OtnLevel client, OtnLevel container, [NotNullWhen(true)] out OtnLevel? foundNextHop)
     {
-        foundIntermediate = null;
+        foundNextHop = null;
 
         if ((int)client >= (int)container)
             return false;
 
         var visited = new HashSet<OtnLevel>();
-        return IsAggregationSupportedRecursive(client, container, visited, out foundIntermediate);
+        return IsAggregationSupportedRecursive(client, container, visited, out foundNextHop);
     }
 
-    private bool IsAggregationSupportedRecursive(OtnLevel current, OtnLevel target, HashSet<OtnLevel> visited, [NotNullWhen(true)] out OtnLevel? foundIntermediate)
+    private bool IsAggregationSupportedRecursive(OtnLevel current, OtnLevel target, HashSet<OtnLevel> visited, [NotNullWhen(true)] out OtnLevel? foundNextHop)
     {
-        foundIntermediate = null;
+        foundNextHop = null;
 
         if (visited.Contains(current))
             return false;
@@ -145,15 +184,19 @@ public class OtnNode
 
         if (IsAggregationSupported(current, target))
         {
-            foundIntermediate = target;
+            foundNextHop = target;
             return true;
         }
 
         var nextLevels = _rules.Where(r => r.ClientType == current).Select(r => r.ContainerType);
         foreach (var next in nextLevels.OrderDescending())
         {
-            if (IsAggregationSupportedRecursive(next, target, visited, out foundIntermediate))
+            // Inefficiency, could gather a path/cache
+            if (IsAggregationSupportedRecursive(next, target, visited, out _))
+            {
+                foundNextHop = next;
                 return true;
+            }
         }
         return false;
     }
