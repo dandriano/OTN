@@ -47,12 +47,30 @@ public class OtnNodeTest
         var baikalNode = new OtnNode(_baikalRuleSet);
         var fullNode = new OtnNode(_fullRuleSet);
 
+        // Some simple direct checks
         Assert.Multiple(() =>
         {
             Assert.That(baikalNode.IsAggregationSupported(OtnLevel.ODU0, OtnLevel.ODU2));
             Assert.That(!baikalNode.IsAggregationSupported(OtnLevel.ODU0, OtnLevel.ODU4));
             Assert.That(fullNode.IsAggregationSupported(OtnLevel.ODU0, OtnLevel.ODU4));
         });
+
+        // Transitive check thru OTNv3 rule set
+        var currentLevel = OtnLevel.ODU0;
+        var targetLevel = OtnLevel.ODU4;
+        
+        var hops = 0;
+        while (currentLevel != targetLevel)
+        {
+            Assert.That(fullNode.IsAggregationSupportedTransitive(currentLevel, targetLevel, out var intermediate));
+            currentLevel = intermediate!.Value;
+            hops++;
+        }
+
+        Assert.That(currentLevel, Is.EqualTo(targetLevel));
+        // Since transitive check produce direct check before going recursive
+        // and the OTNv3 rule set permits direct aggregation ODU0 -> ODU4
+        Assert.That(hops, Is.EqualTo(1));
     }
 
     [Test]
@@ -69,16 +87,13 @@ public class OtnNodeTest
         {
             var otn = client.ToOtnSignal();
             if (otn.OduLevel > OtnLevel.ODU1)
-            {
                 Assert.That(!baikalNode.TryAggregate(otn));
-            }
             else
-            {
                 Assert.That(baikalNode.TryAggregate(otn));
-            }
         }
 
         Assert.That(baikalNode.Signals, Is.Not.Empty);
         Assert.That(baikalNode.Signals, Has.Count.LessThan(capacity));
+        Assert.That(baikalNode.Signals.All(s => s.OduLevel == baikalNode.Signals[0].OduLevel));
     }
 }
