@@ -68,7 +68,6 @@ public class OtnNodeTest
             Assert.That(fullNode.Signals.Single().Aggregation.Single().OduLevel, Is.EqualTo(OtnLevel.ODU0));
         });
 
-
         // Check for random agregation
         var rnd = new Random();
         var clients = Enumerable.Range(0, 5)
@@ -93,6 +92,7 @@ public class OtnNodeTest
         while (baikalNode.Signals.Single().TryAggregate(_clientFactory[2]().ToOtnSignal()))
             continue;
 
+        // No more
         Assert.Multiple(() =>
         {
             Assert.That(baikalNode.Signals, Has.Count.EqualTo(1));  // in OTN Node capacity by default

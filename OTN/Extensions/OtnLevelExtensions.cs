@@ -19,7 +19,7 @@ public static class OtnLevelExtensions
         OtnLevel.ODU0 => 1,
         OtnLevel.ODU1 => 2,
         OtnLevel.ODU2 => 8,
-        OtnLevel.ODU3 => 31,
+        OtnLevel.ODU3 => 32,
         OtnLevel.ODU4 => 80,
         _ => throw new ArgumentOutOfRangeException(nameof(type))
     };
@@ -28,12 +28,12 @@ public static class OtnLevelExtensions
     /// Gets the number of slots available for the given OTN level.
     /// </summary>
     /// <param name="type">The OTN level.</param>
-    /// <returns>The number of slots available, or 0 if none are available.</r
+    /// <returns>The number of slots available, or 0 if none are available.</returns>
     public static int SlotsAvailable(this OtnLevel type) => type switch
     {
         OtnLevel.ODU1 => 2,
         OtnLevel.ODU2 => 8,
-        OtnLevel.ODU3 => 31,
+        OtnLevel.ODU3 => 32,
         OtnLevel.ODU4 => 80,
         _ => 0
     };
@@ -43,7 +43,7 @@ public static class OtnLevelExtensions
     /// </summary>
     /// <param name="type">The OTN level.</param>
     /// <returns>The expected bandwidth in gigabits per second.</returns>
-    /// <exception cref="ArgumentOutOfRangeException">Thrown when the OTN lev
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when the OTN level is not recognized.</exception>
     public static double ExpectedBandwidthGbps(this OtnLevel type) => type switch
     {
         OtnLevel.ODU0 => 1.24416,
@@ -53,32 +53,4 @@ public static class OtnLevelExtensions
         OtnLevel.ODU4 => 104.794446,
         _ => throw new ArgumentOutOfRangeException(nameof(type))
     };
-
-    /// <summary>
-    /// Returns a new OTN level offset by a specified amount.
-    /// </summary>
-    /// <param name="level">The current OTN level.</param>
-    /// <param name="offset">The offset to apply (positive or negative).</param>
-    /// <returns>The offset OTN level, bounded to the defined range.</returns>
-    public static OtnLevel OffsetLevel(this OtnLevel level, int offset)
-    {
-        var newValue = (int)level + offset;
-
-        if (newValue < 0)
-            newValue = 0;
-        else if (newValue > (int)OtnLevel.ODU4)
-            newValue = (int)OtnLevel.ODU4;
-
-        return (OtnLevel)newValue;
-    }
-
-    /// <summary>
-    /// Returns the next higher OTN level if available.
-    /// </summary>
-    /// <param name="level">The current OTN level.</param>
-    /// <returns>The next OTN level, or the current level if already at maximu
-    public static OtnLevel NextLevel(this OtnLevel level)
-    {
-        return level.OffsetLevel(1);
-    }
 }
