@@ -1,11 +1,10 @@
-﻿using System;
+﻿using OTN.Interfaces;
+using System;
 
 namespace OTN;
 
-/// <summary>
-/// Represents a generic (mostly client) signal with associated bandwidth.
-/// </summary>
-public class Signal
+/// <inheritdoc />
+public class Signal : ISignal
 {
     public Guid Id { get; }
     public string Name { get; }

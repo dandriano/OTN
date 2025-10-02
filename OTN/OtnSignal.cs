@@ -1,19 +1,18 @@
 using OTN.Enums;
 using OTN.Extensions;
+using OTN.Interfaces;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 
 namespace OTN;
 
-/// <summary>
-/// Represents an Optical Transport Network (OTN) signal with a specific OTU/ODU level, 
-/// supporting client signal aggregation.
-/// </summary>
-public class OtnSignal : Signal
+/// <inheritdoc />
+public class OtnSignal : Signal, IOtnSignal
 {
-    private readonly List<OtnSignal> _aggregation = new List<OtnSignal>();
-    public IReadOnlyList<OtnSignal> Aggregation => _aggregation.AsReadOnly(); 
+    private readonly List<IOtnSignal> _aggregation = new List<IOtnSignal>();
+    /// <inheritdoc />
+    public IReadOnlyList<IOtnSignal> Aggregation => _aggregation.AsReadOnly();
     public OtnLevel OduLevel { get; }
 
     public OtnSignal(Guid id, string name, double bandwidthGbps, OtnLevel oduLevel)
@@ -22,12 +21,8 @@ public class OtnSignal : Signal
         OduLevel = oduLevel;
     }
 
-    /// <summary>
-    /// Determines whether a client OTN signal can be aggregated within this container OTN signal.
-    /// </summary>
-    /// <param name="client">The client OTN signal to check for aggregation.</param>
-    /// <returns><c>true</c> if the client can be aggregated; otherwise, <c>false</c>.</returns>
-    public bool CanAggregate(OtnSignal client)
+    /// <inheritdoc />
+    public bool CanAggregate(IOtnSignal client, IOtnSettings settings)
     {
         const double tolerance = 0.001;
 
@@ -42,22 +37,18 @@ public class OtnSignal : Signal
         if (Math.Abs(BandwidthGbps - containerExpected) > tolerance)
             return false;
 
-        var currentUsedSlots = _aggregation.Sum(c => c.OduLevel.SlotsRequired());
-        var clientSlots = client.OduLevel.SlotsRequired();
-        if (currentUsedSlots + clientSlots > OduLevel.SlotsAvailable())
+        var currentUsedSlots = _aggregation.Sum(c => settings.SlotsRequired(c.OduLevel));
+        var clientSlots = settings.SlotsRequired(client.OduLevel);
+        if (currentUsedSlots + clientSlots > settings.SlotsAvailable(OduLevel))
             return false;
 
         return true;
     }
 
-    /// <summary>
-    /// Attempts to aggregate a client signal within this OTN signal container.
-    /// </summary>
-    /// <param name="client">The client OTN signal to aggregate.</param>
-    /// <returns><c>true</c> if aggregation is successful; otherwise, <c>false</c>.</returns>
-    public bool TryAggregate(OtnSignal client)
+    /// <inheritdoc />
+    public bool TryAggregate(IOtnSignal client, IOtnSettings settings)
     {
-        if (!CanAggregate(client))
+        if (!CanAggregate(client, settings))
             return false;
 
         _aggregation.Add(client);

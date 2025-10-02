@@ -89,14 +89,14 @@ public class OtnNodeTest
 
         // Let's "fill" a remainning space of the OTN signal with aggregation
         // of STM-1
-        while (baikalNode.Signals.Single().TryAggregate(_clientFactory[2]().ToOtnSignal()))
+        while (baikalNode.TryAggregate(_clientFactory[2]().ToOtnSignal()))
             continue;
 
         // No more
         Assert.Multiple(() =>
         {
             Assert.That(baikalNode.Signals, Has.Count.EqualTo(1));  // in OTN Node capacity by default
-            Assert.That(!baikalNode.Signals.Single().TryAggregate(_clientFactory[rnd.Next(_clientFactory.Count - 1)]().ToOtnSignal()));
+            Assert.That(!baikalNode.TryAggregate(_clientFactory[rnd.Next(_clientFactory.Count - 1)]().ToOtnSignal()));
         });
 
         // Ok, let's assume that baikal could aggregate up to ODU4/100G
