@@ -1,4 +1,6 @@
+using OTN.Core;
 using OTN.Enums;
+using OTN.Interfaces;
 using System;
 using System.Diagnostics.CodeAnalysis;
 
@@ -17,7 +19,7 @@ public static class SignalExtensions
     /// <param name="oduLevel">The targeted OTN level.</param>
     /// <param name="result">When this method returns, contains the OTN signal if conversion is successful; otherwise, null.</param>
     /// <returns><c>true</c> if the conversion is successful; otherwise, <c>false</c>.</returns>
-    public static bool TryToOtnSignal(this Signal signal, OtnLevel oduLevel, [NotNullWhen(true)] out OtnSignal? result)
+    public static bool TryToOtnSignal(this ISignal signal, OtnLevel oduLevel, [NotNullWhen(true)] out OtnSignal? result)
     {
         result = null;
         var expected = oduLevel.ExpectedBandwidthGbps();
@@ -27,7 +29,8 @@ public static class SignalExtensions
         if (signal.BandwidthGbps > expected + _tolerance)
             return false;
 
-        result = new OtnSignal(signal.Id, Enum.GetName(oduLevel)!, expected, oduLevel);
+        result = new OtnSignal(Enum.GetName(oduLevel)!, expected, oduLevel);
+
         return true;
     }
 
@@ -37,7 +40,7 @@ public static class SignalExtensions
     /// <param name="signal">The generic signal.</param>
     /// <returns>The converted OTN signal.</returns>
     /// <exception cref="InvalidOperationException">Thrown when conversion to any OTN level fails.</exception>
-    public static OtnSignal ToOtnSignal(this Signal signal)
+    public static OtnSignal ToOtnSignal(this ISignal signal)
     {
         var minimalLevel = OtnLevel.ODU0;
         var minDiff = double.MaxValue;

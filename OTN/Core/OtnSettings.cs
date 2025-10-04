@@ -1,6 +1,6 @@
 ﻿using OTN.Interfaces;
 
-namespace OTN;
+namespace OTN.Core;
 
 public class DefaultOtnSettings : IOtnSettings
 {

@@ -5,7 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace OTN;
+namespace OTN.Core;
 
 /// <inheritdoc />
 public class OtnSignal : Signal, IOtnSignal
@@ -15,12 +15,16 @@ public class OtnSignal : Signal, IOtnSignal
     public IReadOnlyList<IOtnSignal> Aggregation => _aggregation.AsReadOnly();
     public OtnLevel OduLevel { get; }
 
-    public OtnSignal(Guid id, string name, double bandwidthGbps, OtnLevel oduLevel)
-        : base(id, name, bandwidthGbps)
+    public IOtnNode Source => throw new NotImplementedException();
+
+    public IOtnNode Target => throw new NotImplementedException();
+
+    public OtnSignal(string name, double bandwidthGbps, OtnLevel oduLevel)
+        : base(name, bandwidthGbps)
     {
         OduLevel = oduLevel;
     }
-
+    
     /// <inheritdoc />
     public bool CanAggregate(IOtnSignal client, IOtnSettings settings)
     {
@@ -46,12 +50,23 @@ public class OtnSignal : Signal, IOtnSignal
     }
 
     /// <inheritdoc />
-    public bool TryAggregate(IOtnSignal client, IOtnSettings settings)
+    public bool CanAggregate(ISignal client, IOtnSettings settings, out IOtnSignal otnClient)
     {
-        if (!CanAggregate(client, settings))
+        if (client is IOtnSignal signal)
+            otnClient = signal;
+        else
+            otnClient = client.ToOtnSignal();
+
+        return CanAggregate(otnClient, settings);
+    }
+
+    /// <inheritdoc />
+    public bool TryAggregate(ISignal client, IOtnSettings settings)
+    {
+        if (!CanAggregate(client, settings, out var otnClient))
             return false;
 
-        _aggregation.Add(client);
+        _aggregation.Add(otnClient);
         return true;
     }
 

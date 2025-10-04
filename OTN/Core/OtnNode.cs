@@ -6,7 +6,7 @@ using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 
-namespace OTN;
+namespace OTN.Core;
 
 /// <summary>
 /// Represents a rule defining which client OTN level can be aggregated into which container OTN level.
@@ -114,7 +114,7 @@ public class OtnNode : IOtnNode
             return false;
 
         // Create new container signal to hold client
-        var newContainer = new OtnSignal(Guid.NewGuid(), Enum.GetName(containerLevel!.Value)!, containerLevel.Value.ExpectedBandwidthGbps(), containerLevel.Value);
+        var newContainer = new OtnSignal(Enum.GetName(containerLevel!.Value)!, containerLevel.Value.ExpectedBandwidthGbps(), containerLevel.Value);
         if (newContainer.TryAggregate(client, _settings))
         {
             if (TryAggregate(newContainer, selector))
@@ -187,7 +187,7 @@ public class OtnNode : IOtnNode
         selectedContainer = null;
         foreach (var container in signals.Reverse())
         {
-            if (IsAggregationSupported(client.OduLevel, container.OduLevel) && container.CanAggregate(client, _settings))
+            if (IsAggregationSupported(client.OduLevel, container.OduLevel) && container.CanAggregate(client, _settings, out _))
             {
                 selectedContainer = container;
                 return true;
@@ -201,7 +201,7 @@ public class OtnNode : IOtnNode
         selectedContainer = null;
         foreach (var container in signals)
         {
-            if (IsAggregationSupported(client.OduLevel, container.OduLevel) && container.CanAggregate(client, _settings))
+            if (IsAggregationSupported(client.OduLevel, container.OduLevel) && container.CanAggregate(client, _settings, out _))
             {
                 selectedContainer = container;
                 return true;
@@ -217,7 +217,7 @@ public class OtnNode : IOtnNode
 
         foreach (var container in signals)
         {
-            if (!IsAggregationSupported(client.OduLevel, container.OduLevel) || !container.CanAggregate(client, _settings))
+            if (!IsAggregationSupported(client.OduLevel, container.OduLevel) || !container.CanAggregate(client, _settings, out _))
                 continue;
 
             // Calculate the remaining slots if the client were added.

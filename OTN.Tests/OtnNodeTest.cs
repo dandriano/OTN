@@ -1,3 +1,4 @@
+using OTN.Core;
 using OTN.Enums;
 using OTN.Extensions;
 using System;
@@ -32,13 +33,13 @@ public class OtnNodeTest
         _baikalRuleSet.Add(new AggregationRule(OtnLevel.ODU1, OtnLevel.ODU2));
 
         // Some ethernet clients
-        _clientFactory.Add(() => new Signal(Guid.NewGuid(), "Ethernet 1G", 1.0));       // 1 Gbps approx
-        _clientFactory.Add(() => new Signal(Guid.NewGuid(), "Ethernet 10G", 10.0));     // 10 Gbps approx 
+        _clientFactory.Add(() => new Signal("Ethernet 1G", 1.0));       // 1 Gbps approx
+        _clientFactory.Add(() => new Signal("Ethernet 10G", 10.0));     // 10 Gbps approx 
 
         // Some SDH clients
-        _clientFactory.Add(() => new Signal(Guid.NewGuid(), "SDH STM-1", 0.15552));     // 155.52 Mbps
-        _clientFactory.Add(() => new Signal(Guid.NewGuid(), "SDH STM-4", 0.62208));     // 622.08 Mbps
-        _clientFactory.Add(() => new Signal(Guid.NewGuid(), "SDH STM-16", 2.48832));    // 2.488 Gbps
+        _clientFactory.Add(() => new Signal("SDH STM-1", 0.15552));     // 155.52 Mbps
+        _clientFactory.Add(() => new Signal("SDH STM-4", 0.62208));     // 622.08 Mbps
+        _clientFactory.Add(() => new Signal("SDH STM-16", 2.48832));    // 2.488 Gbps
     }
 
     [Test]
