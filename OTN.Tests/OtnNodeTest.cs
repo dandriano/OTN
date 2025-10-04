@@ -43,7 +43,36 @@ public class OtnNodeTest
     }
 
     [Test]
-    public void AggregationRuleTest()
+    public void Constructor_CheckRules()
+    {
+        // Two "head" rule
+        var invalidRules = new List<AggregationRule>()
+        {
+            new AggregationRule(OtnLevel.ODU0, OtnLevel.ODU2),
+            new AggregationRule(OtnLevel.ODU0, OtnLevel.ODU4)
+        };
+
+        Assert.Throws<InvalidOperationException>(() =>
+        {
+            var otn = new OtnNode(invalidRules);
+        });
+
+        // Stupid, but...
+        var stupidButOkRule = new List<AggregationRule>()
+        {
+            new AggregationRule(OtnLevel.ODU0, OtnLevel.ODU2),
+            new AggregationRule(OtnLevel.ODU0, OtnLevel.ODU4),
+            new AggregationRule(OtnLevel.ODU2, OtnLevel.ODU4),
+        };
+
+        Assert.DoesNotThrow(() =>
+        {
+            var otn = new OtnNode(stupidButOkRule);
+        });
+    }
+
+    [Test]
+    public void IsAggregationSupported_ReturnsExpectedResultsForDifferentRuleSets()
     {
         var baikalNode = new OtnNode(_baikalRuleSet);
         var fullNode = new OtnNode(_fullRuleSet);
@@ -58,7 +87,7 @@ public class OtnNodeTest
     }
 
     [Test]
-    public void ClientAggregationTest()
+    public void TryAggregate_HandlesDirectAndTransitiveAggregation()
     {
         var fullNode = new OtnNode(_fullRuleSet);
         // Check for direct aggregation
@@ -116,36 +145,7 @@ public class OtnNodeTest
     }
 
     [Test]
-    public void CreateInvalidOtnNodeTest()
-    {
-        // Two "head" rule
-        var invalidRules = new List<AggregationRule>()
-        {
-            new AggregationRule(OtnLevel.ODU0, OtnLevel.ODU2),
-            new AggregationRule(OtnLevel.ODU0, OtnLevel.ODU4)
-        };
-
-        Assert.Throws<InvalidOperationException>(() =>
-        {
-            var otn = new OtnNode(invalidRules);
-        });
-
-        // Stupid, but...
-        var stupidButOkRule = new List<AggregationRule>()
-        {
-            new AggregationRule(OtnLevel.ODU0, OtnLevel.ODU2),
-            new AggregationRule(OtnLevel.ODU0, OtnLevel.ODU4),
-            new AggregationRule(OtnLevel.ODU2, OtnLevel.ODU4),
-        };
-
-        Assert.DoesNotThrow(() =>
-        {
-            var otn = new OtnNode(stupidButOkRule);
-        });
-    }
-
-    [Test]
-    public void CpacityOtnNodeTest()
+    public void TryAggregate_EnforcesCapacityLimit()
     {
         // Line 1xODU2 OTN Node
         var baikalNode = new OtnNode(_baikalRuleSet);
