@@ -1,5 +1,6 @@
 ﻿using OTN.Core;
 using OTN.Enums;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 
@@ -13,6 +14,8 @@ namespace OTN.Interfaces;
 /// </remarks>
 public interface IOtnNode
 {
+    Guid Id { get; }
+    INetNode NetNode { get; }
     /// <summary>
     /// HO OTN signals
     /// </summary>
@@ -49,15 +52,17 @@ public interface IOtnNode
     /// Supports multiple bin packing heuristics: NextFit (default), FirstFit, BestFit, WorstFit.
     /// </remarks>
     /// <param name="client">The client OTN signal to add.</param>
+    /// <param name="aggregated">The aggregation result</param>
     /// <param name="strategy">The aggregation/bin packing strategy to use. Defaults to NextFit.</param>
     /// <returns><c>true</c> if the client signal was successfully aggregated; otherwise, <c>false</c>.</returns>
-    bool TryAggregate(IOtnSignal client, AggregationStrategy strategy = AggregationStrategy.NextFit);
+    bool TryAggregate(IOtnSignal client, [NotNullWhen(true)] out IOtnSignal? aggregated, AggregationStrategy strategy = AggregationStrategy.NextFit);
     /// <summary>
     /// Attempts to add a client OTN signal to this node
     /// The signal is assigned to the last suitable container signal if possible; otherwise, a new container is created.
     /// </summary>
     /// <param name="client">The client OTN signal to add.</param>
+    /// <param name="aggregated">The aggregation result</param>
     /// <param name="selector">The delegate to select a fitting container.</param>
     /// <returns><c>true</c> if the client signal was successfully aggregated; otherwise, <c>false</c>.</returns>
-    bool TryAggregate(IOtnSignal client, AggregationSelector selector);
+    bool TryAggregate(IOtnSignal client, [NotNullWhen(true)] out IOtnSignal? aggregated, AggregationSelector selector);
 }

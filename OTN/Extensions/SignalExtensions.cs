@@ -29,7 +29,11 @@ public static class SignalExtensions
         if (signal.BandwidthGbps > expected + _tolerance)
             return false;
 
-        result = new OtnSignal(Enum.GetName(oduLevel)!, expected, oduLevel);
+        result = new OtnSignal(Enum.GetName(oduLevel)!,
+                               expected,
+                               oduLevel,
+                               signal.Source,
+                               signal.Target);
 
         return true;
     }

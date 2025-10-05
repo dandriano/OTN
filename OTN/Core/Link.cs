@@ -1,7 +1,7 @@
-using System;
 using OTN.Enums;
 using OTN.Interfaces;
 using QuikGraph;
+using System;
 
 namespace OTN.Core;
 
