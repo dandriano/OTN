@@ -1,0 +1,59 @@
+﻿@page "/"
+
+@using OTN.Wasm.Extensions
+@using Excubo.Blazor.Canvas
+@using System
+@using System.Threading
+
+<div>
+
+    <Canvas @ref="helper_canvas" @bind-width="_width" @bind-height="_height" />
+
+    <div class="caption-text">
+        FPS: @((int)(_elapsedTime.TotalMilliseconds > 0 ? 1000f / _elapsedTime.TotalMilliseconds : 0))     Size: @_width X @_height     Coord: @_x/@_xc X @_y/@_yc
+    </div>
+
+</div>
+
+@code {
+    private Canvas helper_canvas = null!;
+    //private GraphMode _graphMode;
+    private DateTime _lastUpdate = DateTime.Now;
+    private TimeSpan _elapsedTime = TimeSpan.Zero;
+    private bool _hasChanges = true;
+    //private Network? _network;
+    private NetworkSettings _settings = null!;
+    private NetworkRenderer _renderer = null!;
+    private int _width = 800;
+    private int _height = 600;
+    //--- pan and scale
+    private float _x;
+    private float _y;
+    private float _xc;
+    private float _yc;
+    private float _scale;
+    private bool _isMouseDown;
+    //---
+
+    protected override void OnInitialized() 
+    {
+        _settings = NetworkSettings.Default;
+        _settings.SetSize(_width, _height);
+        _settings.SetColour("black", "white");
+        
+        _renderer = new NetworkRenderer(_settings);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        _elapsedTime = DateTime.Now.Subtract(_lastUpdate);
+        _lastUpdate = DateTime.Now;
+
+        await using (var ctx = await helper_canvas.GetContext2DAsync())
+        {
+            await _renderer.Render(ctx);
+        }
+
+        await base.OnAfterRenderAsync(firstRender);
+    }
+}
