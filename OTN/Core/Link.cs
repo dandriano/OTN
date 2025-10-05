@@ -14,11 +14,11 @@ public class Link : EquatableTaggedEdge<INetNode, double>, ILink
     LinkType LinkType { get; }
     public Link? Reverse { get; private set; }
 
-    protected Link(Node source, Node target, long weight, LinkType linkType) : base(source, target, weight)
+    public Link(INetNode source, INetNode target, double weight, LinkType linkType = LinkType.Undirected) : base(source, target, weight)
     {
         LinkType = linkType;
         if (LinkType == LinkType.Undirected)
-            Reverse = new Link(target, source, weight, linkType);
+            SetReverse(new Link(target, source, weight, linkType));
     }
 
     private void SetReverse(Link reverse)
