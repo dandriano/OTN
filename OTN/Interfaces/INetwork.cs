@@ -12,7 +12,7 @@ public interface INetwork
     BidirectionalGraph<INetNode, ILink> Optical { get; }
     BidirectionalGraph<IOtnNode, ISignal> Electrical { get; }
 
-    INetNode AddNetNode();
+    INetNode AddNetNode(NetNodeType type);
     ILink AddLink(INetNode source, INetNode target, double length, LinkType linkType = LinkType.Undirected);
     IOtnNode AddOtnNode(INetNode node, IEnumerable<AggregationRule> rules, int capacity = 1);
     IOtnNode AddOtnNode(INetNode node, IEnumerable<AggregationRule> rules, IOtnSettings settings, int capacity = 1);

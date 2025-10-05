@@ -7,12 +7,13 @@ namespace OTN.Core;
 /// <summary>
 /// Representation of a network node on a graph
 /// </summary>
-public class Node : INetNode
+public class NetNode : INetNode
 {
     public Guid Id { get; init; } = Guid.NewGuid();
     public NetNodeType Type { get; private set; }
+    public RouteNodeType RoutingType { get; private set; } = RouteNodeType.Undefined;
 
-    public Node(NetNodeType type = NetNodeType.Terminal)
+    public NetNode(NetNodeType type)
     {
         Type = type;
     }

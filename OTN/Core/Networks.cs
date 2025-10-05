@@ -23,9 +23,9 @@ public class Network : INetwork
     public BidirectionalGraph<IOtnNode, ISignal> Electrical { get; }
         = new BidirectionalGraph<IOtnNode, ISignal>();
 
-    public INetNode AddNetNode()
+    public INetNode AddNetNode(NetNodeType type)
     {
-        var n = new Node();
+        var n = new NetNode(type);
         if (!Optical.AddVertex(n))
             throw new InvalidOperationException();
         return n;

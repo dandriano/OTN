@@ -92,6 +92,6 @@ public class OtnSignal : Signal, IOtnSignal
 
     public override string ToString()
     {
-        return base.ToString() + $", ODU Level: {OduLevel}, Aggregated Clients: {_aggregation.Count}";
+        return base.ToString() + $", ODU Level: {OduLevel}, Aggregation count: {_aggregation.Count}";
     }
 }
