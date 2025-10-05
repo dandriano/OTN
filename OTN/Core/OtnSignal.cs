@@ -1,6 +1,7 @@
 using OTN.Enums;
 using OTN.Extensions;
 using OTN.Interfaces;
+using QuikGraph;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -10,15 +11,19 @@ namespace OTN.Core;
 /// <inheritdoc />
 public class OtnSignal : Signal, IOtnSignal
 {
-    private readonly Dictionary<Guid, IOtnSignal> _aggregation
-        = new Dictionary<Guid, IOtnSignal>();
+    private readonly Dictionary<Guid, OtnSignal> _aggregation
+        = new Dictionary<Guid, OtnSignal>();
 
     /// <inheritdoc />
     public IEnumerable<IOtnSignal> Signals => _aggregation.Values;
     public int SignalCount => _aggregation.Count;
     public OtnLevel OduLevel { get; }
 
-    public OtnSignal(IOtnNode source, IOtnNode target, double bandwidthGbps, OtnLevel oduLevel)
+    IOtnNode IEdge<IOtnNode>.Source => Source;
+
+    IOtnNode IEdge<IOtnNode>.Target => Target;
+
+    public OtnSignal(OtnNode source, OtnNode target, double bandwidthGbps, OtnLevel oduLevel)
     : base(source, target, bandwidthGbps)
     {
         OduLevel = oduLevel;
@@ -49,7 +54,7 @@ public class OtnSignal : Signal, IOtnSignal
     }
 
     /// <inheritdoc />
-    public bool CanAggregate(ISignal client, IOtnSettings settings, out IOtnSignal otnClient)
+    public bool CanAggregate(Signal client, IOtnSettings settings, out IOtnSignal otnClient)
     {
         if (client is IOtnSignal signal)
             otnClient = signal;
@@ -60,7 +65,7 @@ public class OtnSignal : Signal, IOtnSignal
     }
 
     /// <inheritdoc />
-    public bool TryAggregate(IOtnSignal otnClient, IOtnSettings settings)
+    public bool TryAggregate(OtnSignal otnClient, IOtnSettings settings)
     {
         if (!CanAggregate(otnClient, settings))
             return false;
@@ -70,7 +75,7 @@ public class OtnSignal : Signal, IOtnSignal
     }
 
     /// <inheritdoc />
-    public bool TryDeAggregate(IOtnSignal otnClient)
+    public bool TryDeAggregate(OtnSignal otnClient)
     {
         // Direct removal
         if (_aggregation.Remove(otnClient.Id))

@@ -1,9 +1,8 @@
-using QuikGraph;
 using System;
 
 namespace OTN.Interfaces;
 
-public interface ILink : IEdge<INetNode>, ITagged<double>
+public interface ILink
 {
     Guid Id { get; }
 }

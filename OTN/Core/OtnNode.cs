@@ -22,7 +22,7 @@ public record AggregationRule(OtnLevel ClientType, OtnLevel ContainerType);
 /// <param name="client">The client signal to aggregate.</param>
 /// <param name="selectedContainer">When this method returns <c>true</c>, contains the selected container; otherwise, <c>null</c>.</param>
 /// <returns><c>true</c> if a fitting container was found; otherwise, <c>false</c>.</returns>
-public delegate bool AggregationSelector(IEnumerable<IOtnSignal> signals, IOtnSignal client, [NotNullWhen(true)] out IOtnSignal? selectedContainer);
+public delegate bool AggregationSelector(IEnumerable<OtnSignal> signals, OtnSignal client, [NotNullWhen(true)] out OtnSignal? selectedContainer);
 
 
 /// <summary>
@@ -40,8 +40,8 @@ public class OtnNode : IOtnNode
     private readonly IOtnSettings _settings;
     private readonly List<AggregationRule> _rules
         = new List<AggregationRule>();
-    private readonly Dictionary<Guid, IOtnSignal> _signals
-        = new Dictionary<Guid, IOtnSignal>();
+    private readonly Dictionary<Guid, OtnSignal> _signals
+        = new Dictionary<Guid, OtnSignal>();
 
     public Guid Id { get; } = Guid.NewGuid();
     public INetNode NetNode { get; }
@@ -107,7 +107,7 @@ public class OtnNode : IOtnNode
     }
 
     /// <inheritdoc />
-    public bool TryAggregate(IOtnSignal client, [NotNullWhen(true)] out IOtnSignal? aggregated, AggregationStrategy strategy = AggregationStrategy.NextFit)
+    public bool TryAggregate(OtnSignal client, [NotNullWhen(true)] out OtnSignal? aggregated, AggregationStrategy strategy = AggregationStrategy.NextFit)
     {
         AggregationSelector selector = strategy switch
         {
@@ -131,7 +131,7 @@ public class OtnNode : IOtnNode
     /// <param name="aggregated">The aggregation result</param>
     /// <param name="selector">The delegate to select a fitting container.</param>
     /// <returns><c>true</c> if the client signal was successfully aggregated; otherwise, <c>false</c>.</returns>
-    public bool TryAggregate(IOtnSignal client, [NotNullWhen(true)] out IOtnSignal? aggregated, AggregationSelector selector)
+    public bool TryAggregate(OtnSignal client, [NotNullWhen(true)] out OtnSignal? aggregated, AggregationSelector selector)
     {
         aggregated = null;
         var targetLevel = _rules.Select(r => r.ContainerType).Max();
@@ -177,7 +177,7 @@ public class OtnNode : IOtnNode
     }
 
     /// <inheritdoc/>
-    public bool TryDeAggregate(IOtnSignal client, [NotNullWhen(true)] out IOtnSignal? deAggregated)
+    public bool TryDeAggregate(OtnSignal client, [NotNullWhen(true)] out OtnSignal? deAggregated)
     {
         deAggregated = null;
         if (_signals.Remove(client.Id))
@@ -250,7 +250,7 @@ public class OtnNode : IOtnNode
         return false;
     }
 
-    private bool NextFitSelector(IEnumerable<IOtnSignal> signals, IOtnSignal client, [NotNullWhen(true)] out IOtnSignal? selectedContainer)
+    private bool NextFitSelector(IEnumerable<OtnSignal> signals, OtnSignal client, [NotNullWhen(true)] out OtnSignal? selectedContainer)
     {
         selectedContainer = null;
         foreach (var container in signals.Reverse())
@@ -264,7 +264,7 @@ public class OtnNode : IOtnNode
         return false;
     }
 
-    private bool FirstFitSelector(IEnumerable<IOtnSignal> signals, IOtnSignal client, [NotNullWhen(true)] out IOtnSignal? selectedContainer)
+    private bool FirstFitSelector(IEnumerable<OtnSignal> signals, OtnSignal client, [NotNullWhen(true)] out OtnSignal? selectedContainer)
     {
         selectedContainer = null;
         foreach (var container in signals)
@@ -278,7 +278,7 @@ public class OtnNode : IOtnNode
         return false;
     }
 
-    private bool BestFitSelector(IEnumerable<IOtnSignal> signals, IOtnSignal client, [NotNullWhen(true)] out IOtnSignal? selectedContainer)
+    private bool BestFitSelector(IEnumerable<OtnSignal> signals, OtnSignal client, [NotNullWhen(true)] out OtnSignal? selectedContainer)
     {
         selectedContainer = null;
         int minRemaining = int.MaxValue;
@@ -303,7 +303,7 @@ public class OtnNode : IOtnNode
         return selectedContainer != null;
     }
 
-    private bool WorstFitSelector(IEnumerable<IOtnSignal> signals, IOtnSignal client, [NotNullWhen(true)] out IOtnSignal? selectedContainer)
+    private bool WorstFitSelector(IEnumerable<OtnSignal> signals, OtnSignal client, [NotNullWhen(true)] out OtnSignal? selectedContainer)
     {
         selectedContainer = null;
         int maxRemaining = int.MinValue;

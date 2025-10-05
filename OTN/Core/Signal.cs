@@ -1,17 +1,18 @@
 ﻿using OTN.Interfaces;
+using QuikGraph;
 using System;
 
 namespace OTN.Core;
 
 /// <inheritdoc />
-public class Signal : ISignal
+public class Signal : ISignal, IEdge<OtnNode>
 {
     public Guid Id { get; } = Guid.NewGuid();
     public double BandwidthGbps { get; }
-    public IOtnNode Source { get; } = null!;
-    public IOtnNode Target { get; } = null!;
+    public OtnNode Source { get; } = null!;
+    public OtnNode Target { get; } = null!;
 
-    public Signal(IOtnNode source, IOtnNode target, double bandwidthGbps)
+    public Signal(OtnNode source, OtnNode target, double bandwidthGbps)
     {
         BandwidthGbps = bandwidthGbps;
         Source = source;

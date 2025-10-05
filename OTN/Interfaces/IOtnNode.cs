@@ -45,34 +45,4 @@ public interface IOtnNode
     /// through one or more intermediate levels; otherwise, <c>false</c>.
     /// </returns>
     bool IsAggregationSupportedTransitive(OtnLevel client, OtnLevel container, [NotNullWhen(true)] out OtnLevel? foundNextHop);
-    /// <summary>
-    /// Attempts to add a client OTN signal to this node
-    /// The signal is assigned to the last suitable container signal if possible; otherwise, a new container is created.
-    /// </summary>
-    /// <remarks>
-    /// Supports multiple bin packing heuristics: NextFit (default), FirstFit, BestFit, WorstFit.
-    /// </remarks>
-    /// <param name="client">The client OTN signal to add.</param>
-    /// <param name="aggregated">The aggregation result</param>
-    /// <param name="strategy">The aggregation/bin packing strategy to use. Defaults to NextFit.</param>
-    /// <returns><c>true</c> if the client signal was successfully aggregated; otherwise, <c>false</c>.</returns>
-    bool TryAggregate(IOtnSignal client, [NotNullWhen(true)] out IOtnSignal? aggregated, AggregationStrategy strategy = AggregationStrategy.NextFit);
-    /// <summary>
-    /// Attempts to add a client OTN signal to this node
-    /// The signal is assigned to the last suitable container signal if possible; otherwise, a new container is created.
-    /// </summary>
-    /// <param name="client">The client OTN signal to add.</param>
-    /// <param name="aggregated">The aggregation result</param>
-    /// <param name="selector">The delegate to select a fitting container.</param>
-    /// <returns><c>true</c> if the client signal was successfully aggregated; otherwise, <c>false</c>.</returns>
-    bool TryAggregate(IOtnSignal client, [NotNullWhen(true)] out IOtnSignal? aggregated, AggregationSelector selector);
-    /// <summary>
-    /// Attempts to de-aggregate the specified client signal from the node's signal hierarchy.
-    /// If successful, cleans up any empty containers recursively up the chain.
-    /// </summary>
-    /// <param name="client">The client signal to de-aggregate.</param>
-    /// <param name="deAggregated">When this method returns <c>true</c>, 
-    /// contains the affected container; otherwise, <c>null</c>.</param>
-    /// <returns><c>true</c> if the signal was found and removed; otherwise, <c>false</c>.</returns>
-    public bool TryDeAggregate(IOtnSignal client, [NotNullWhen(true)] out IOtnSignal? deAggregated);
 }

@@ -14,7 +14,7 @@ public class OtnNodeTest
     private readonly NetNodeType _dummyType = NetNodeType.Terminal;
     private List<AggregationRule> _fullRuleSet = new List<AggregationRule>();
     private List<AggregationRule> _baikalRuleSet = new List<AggregationRule>();
-    private List<Func<IOtnNode, IOtnNode, ISignal>> _clientFactory = new List<Func<IOtnNode, IOtnNode, ISignal>>();
+    private List<Func<OtnNode, OtnNode, Signal>> _clientFactory = new List<Func<OtnNode, OtnNode, Signal>>();
 
     [OneTimeSetUp]
     public void SetUp()
@@ -45,7 +45,7 @@ public class OtnNodeTest
     }
 
     [Test]
-    public void Constructor_CheckRules()
+    public void Constructor_AssertRules()
     {
         // Two "head" rule
         var invalidRules = new List<AggregationRule>()
@@ -74,7 +74,7 @@ public class OtnNodeTest
     }
 
     [Test]
-    public void IsAggregationSupported_ReturnsExpectedResultsForDifferentRuleSets()
+    public void IsAggregationSupported_AssertExpectedResultsForDifferentRuleSets()
     {
         var baikalNode = new OtnNode(new NetNode(_dummyType), _baikalRuleSet);
         var fullNode = new OtnNode(new NetNode(_dummyType), _fullRuleSet);
@@ -89,7 +89,7 @@ public class OtnNodeTest
     }
 
     [Test]
-    public void TryAggregate_HandlesAggregation()
+    public void TryAggregate_AssertHandlesAggregation()
     {
         var fullNode1 = new OtnNode(new NetNode(_dummyType), _fullRuleSet);
         var fullNode2 = new OtnNode(new NetNode(_dummyType), _fullRuleSet);
@@ -165,13 +165,13 @@ public class OtnNodeTest
     }
 
     [Test]
-    public void TryDeAggregate_HandlesDeAggregation()
+    public void TryDeAggregate_AssertHandlesDeAggregation()
     {
         // Line 1xODU2 OTN Node
         var assertId = Guid.Empty;
         var baikalNode1 = new OtnNode(new NetNode(_dummyType), _baikalRuleSet);
         var baikalNode2 = new OtnNode(new NetNode(_dummyType), _baikalRuleSet);
-        var aggregation = new Queue<IOtnSignal>();
+        var aggregation = new Queue<OtnSignal>();
 
         // 4xGE + 4xSTM-1
         for (int i = 0; i < 8; i++)
