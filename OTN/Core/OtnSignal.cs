@@ -10,14 +10,16 @@ namespace OTN.Core;
 /// <inheritdoc />
 public class OtnSignal : Signal, IOtnSignal
 {
-    private readonly List<IOtnSignal> _aggregation = new List<IOtnSignal>();
+    private readonly Dictionary<Guid, IOtnSignal> _aggregation
+        = new Dictionary<Guid, IOtnSignal>();
 
     /// <inheritdoc />
-    public IReadOnlyList<IOtnSignal> Aggregation => _aggregation.AsReadOnly();
+    public IEnumerable<IOtnSignal> Signals => _aggregation.Values;
+    public int SignalCount => _aggregation.Count;
     public OtnLevel OduLevel { get; }
 
-    public OtnSignal(string name, double bandwidthGbps, OtnLevel oduLevel, IOtnNode source, IOtnNode target)
-    : base(name, bandwidthGbps, source, target)
+    public OtnSignal(IOtnNode source, IOtnNode target, double bandwidthGbps, OtnLevel oduLevel)
+    : base(source, target, bandwidthGbps)
     {
         OduLevel = oduLevel;
     }
@@ -38,7 +40,7 @@ public class OtnSignal : Signal, IOtnSignal
         if (Math.Abs(BandwidthGbps - containerExpected) > tolerance)
             return false;
 
-        var currentUsedSlots = _aggregation.Sum(c => settings.SlotsRequired(c.OduLevel));
+        var currentUsedSlots = _aggregation.Sum(c => settings.SlotsRequired(c.Value.OduLevel));
         var clientSlots = settings.SlotsRequired(client.OduLevel);
         if (currentUsedSlots + clientSlots > settings.SlotsAvailable(OduLevel))
             return false;
@@ -63,8 +65,29 @@ public class OtnSignal : Signal, IOtnSignal
         if (!CanAggregate(otnClient, settings))
             return false;
 
-        _aggregation.Add(otnClient);
+        _aggregation.Add(otnClient.Id, otnClient);
         return true;
+    }
+
+    /// <inheritdoc />
+    public bool TryDeAggregate(IOtnSignal otnClient)
+    {
+        // Direct removal
+        if (_aggregation.Remove(otnClient.Id))
+            return true;
+
+        // Recursive removal in subtrees
+        foreach (var sub in _aggregation.ToList())
+        {
+            if (sub.Value.TryDeAggregate(otnClient))
+            {
+                if (sub.Value.SignalCount == 0)
+                    _aggregation.Remove(sub.Key);
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public override string ToString()

@@ -12,6 +12,9 @@ namespace OTN.Core;
 /// </summary>
 public class Network : INetwork
 {
+    private readonly Dictionary<Guid, IOtnSignal> _signalMap
+        = new Dictionary<Guid, IOtnSignal>();
+
     public Guid Id { get; } = Guid.NewGuid();
 
     public BidirectionalGraph<INetNode, ILink> Optical { get; }
@@ -51,7 +54,12 @@ public class Network : INetwork
         return n;
     }
 
-    public IOtnSignal AddSignal(ISignal signal)
+    public IOtnSignal AddSignal(IOtnNode source, IOtnNode target, double bandwidthGbps, AggregationStrategy strategy = AggregationStrategy.NextFit)
+    {
+        return AddSignal(new Signal(source, target, bandwidthGbps), strategy);
+    }
+
+    public IOtnSignal AddSignal(ISignal signal, AggregationStrategy strategy = AggregationStrategy.NextFit)
     {
         if (signal is IOtnSignal)
             throw new InvalidOperationException();
@@ -59,8 +67,10 @@ public class Network : INetwork
             throw new InvalidOperationException();
 
         var s = signal.ToOtnSignal();
-        if (!(s.Source.TryAggregate(s, out var aggregated) && s.Target.TryAggregate(aggregated, out _)))
+        if (!(s.Source.TryAggregate(s, out var aggregated, strategy) && s.Target.TryAggregate(aggregated, out _, strategy)))
             throw new InvalidOperationException();
+
+        _signalMap.Add(signal.Id, s);
 
         return s;
     }
