@@ -1,9 +1,9 @@
+using System;
+using System.Collections.Generic;
 using OTN.Enums;
 using OTN.Extensions;
 using OTN.Interfaces;
 using QuikGraph;
-using System;
-using System.Collections.Generic;
 
 namespace OTN.Core;
 

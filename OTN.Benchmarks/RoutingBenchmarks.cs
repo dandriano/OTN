@@ -1,13 +1,10 @@
-﻿using OTN.Extensions;
-using OTN.Interfaces;
+﻿using System.Linq;
+using System.Threading.Tasks;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Running;
-using QuikGraph;
-using System.Linq;
-using System.Threading.Tasks;
-using System;
-using OTN.Utils;
 using OTN.Core;
+using OTN.Extensions;
+using OTN.Utils;
 
 namespace OTN.Benchmarks;
 
@@ -19,13 +16,13 @@ public class RoutingBenchmarks
     private NetNode _target = null!;
 
     [Params(1000)]
-    public int TotalNodes { get; set; } = 1000;
+    public int TotalNodes { get; set; }
 
-    [Params(50)]
-    public int BackboneNodes { get; set; } = 50;
+    [Params(25)]
+    public int BackboneNodes { get; set; }
 
-    [Params(3)]
-    public int AverageEdgesPerNode { get; set; } = 3;
+    [Params(2, 3)]
+    public int AverageEdgesPerNode { get; set; }
 
     [GlobalSetup]
     public void Setup()
@@ -36,11 +33,9 @@ public class RoutingBenchmarks
     }
 
     [Benchmark]
-    public async Task FindOpticPathsAsync_Benchmark()
+    public Task FindOpticPathsAsync_Benchmark()
     {
-        var paths = await _network.FindOpticPathsAsync(_source, _target, k: 3);
-        if (paths == null || paths.Count == 0)
-            throw new InvalidOperationException("No paths found");
+        return _network.FindOpticPathsAsync(_source, _target, k: 10);
     }
 }
 

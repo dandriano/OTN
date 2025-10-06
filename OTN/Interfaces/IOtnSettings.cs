@@ -1,5 +1,5 @@
-﻿using OTN.Enums;
-using System;
+﻿using System;
+using OTN.Enums;
 
 namespace OTN.Interfaces;
 

@@ -1,6 +1,6 @@
+using System;
 using OTN.Enums;
 using OTN.Interfaces;
-using System;
 
 namespace OTN.Core;
 

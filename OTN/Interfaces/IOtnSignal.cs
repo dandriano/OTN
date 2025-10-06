@@ -1,6 +1,6 @@
-﻿using OTN.Enums;
+﻿using System.Collections.Generic;
+using OTN.Enums;
 using QuikGraph;
-using System.Collections.Generic;
 
 namespace OTN.Interfaces;
 

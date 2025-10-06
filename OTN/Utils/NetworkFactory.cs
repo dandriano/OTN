@@ -1,8 +1,8 @@
+using System;
+using System.Collections.Generic;
 using OTN.Core;
 using OTN.Enums;
 using QuikGraph;
-using System;
-using System.Collections.Generic;
 
 namespace OTN.Utils;
 
@@ -71,7 +71,7 @@ public static class NetworkFactory
                     var link = new Link(nodes[i], connectTo, w);
                     graph.AddVerticesAndEdge(link);
 
-                    if (rand.Next(2) % 2 == 0)
+                    if (rand.Next(2) == 0)
                         continue;
 
                     var reverseLink = new Link(connectTo, nodes[i], w);

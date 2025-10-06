@@ -1,6 +1,6 @@
-﻿using OTN.Interfaces;
+﻿using System;
+using OTN.Interfaces;
 using QuikGraph;
-using System;
 
 namespace OTN.Core;
 

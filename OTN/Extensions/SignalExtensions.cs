@@ -1,7 +1,7 @@
-using OTN.Core;
-using OTN.Enums;
 using System;
 using System.Diagnostics.CodeAnalysis;
+using OTN.Core;
+using OTN.Enums;
 
 namespace OTN.Extensions;
 

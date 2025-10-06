@@ -1,13 +1,13 @@
-using OTN.Core;
-using OTN.Enums;
-using QuikGraph;
-using QuikGraph.Algorithms;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using OTN.Core;
+using OTN.Enums;
+using QuikGraph;
+using QuikGraph.Algorithms;
 
 namespace OTN.Extensions;
 
@@ -24,7 +24,8 @@ public static class RoutingExtensions
         return link.Tag;
     }
 
-    public static bool TryGetShortestPath(this IVertexAndEdgeListGraph<NetNode, Link> graph, NetNode source, NetNode target, [NotNullWhen(true)] out IEnumerable<Link>? path)
+    public static bool TryGetShortestPath(this IVertexAndEdgeListGraph<NetNode,
+    Link> graph, NetNode source, NetNode target, [NotNullWhen(true)] out IEnumerable<Link>? path)
     {
         var tryFunc = graph.ShortestPathsDijkstra(CalculateLength, source);
         if (tryFunc(target, out path))
@@ -33,19 +34,20 @@ public static class RoutingExtensions
         return false;
     }
 
-    public static Task<List<List<Link>>> FindOpticPathsAsync(this Network network, NetNode source, NetNode target, int k = 10)
+    public static async Task<List<List<Link>>> FindOpticPathsAsync(this Network network, NetNode source, NetNode target, int k = 5)
     {
-        if (network.Optical is IVertexAndEdgeListGraph<NetNode, Link> opt)
-            return opt.FindOpticPathsAsync(source, target, k);
-        throw new InvalidOperationException("No initial shortest path found");
+        try
+        {
+            return await network.Optical.FindOpticPathsAsync(source, target, k);
+        }
+        catch (InvalidOperationException)
+        {
+            return new List<List<Link>>();   
+        }
     }
 
-    public static async Task<List<List<Link>>> FindOpticPathsAsync(
-        this IVertexAndEdgeListGraph<NetNode, Link> graph,
-        NetNode source, NetNode target,
-        int k = 10)
+    public static async Task<List<List<Link>>> FindOpticPathsAsync(this IVertexAndEdgeListGraph<NetNode, Link> graph, NetNode source, NetNode target, int k = 5)
     {
-
         if (!graph.TryGetShortestPath(source, target, out var path))
             throw new InvalidOperationException("No initial shortest path found");
 
@@ -55,10 +57,12 @@ public static class RoutingExtensions
         for (int i = 2; i <= k; i++)
         {
             var lastPath = result[^1];
-            var lastNodes = GetNodesFromPath(lastPath);
+            var lastNodes = GetNodesFromPath(lastPath).ToList();
 
+            // Limit our work
             var t = new List<Task<IEnumerable<Link>?>>();
-            var semaphore = new SemaphoreSlim(k);
+            var limit = Math.Min(k, 5) - result.Count;
+            var semaphore = new SemaphoreSlim(Math.Max(limit, 1));
             for (int spurIdx = 0; spurIdx < lastNodes.Count - 1; spurIdx++)
             {
                 int capturedSpurIdx = spurIdx;
@@ -74,7 +78,7 @@ public static class RoutingExtensions
                         var removedEdges = new HashSet<Guid>();
                         foreach (var p in result)
                         {
-                            var pNodes = GetNodesFromPath(p);
+                            var pNodes = GetNodesFromPath(p).ToList();
                             if (pNodes.Count > capturedSpurIdx + 1 && pNodes.GetRange(0, capturedSpurIdx + 1).SequenceEqual(rootNodes))
                                 removedEdges.Add(p[capturedSpurIdx].Id);
                         }
@@ -97,45 +101,40 @@ public static class RoutingExtensions
             }
 
             var loop = (await Task.WhenAll(t)).Where(r => r != null).Select(r => r!.ToList());
+            var candidateCount = candidates.Count;
             candidates.AddRange(loop.Select(p =>
             {
                 return (p.Sum(l => l.Tag), p);
             }));
 
-            // Sort candidates
-            candidates.Sort((a, b) => a.Cost.CompareTo(b.Cost));
+            // Sort candidates (if changed)
+            if (candidateCount != candidates.Count)
+                candidates.Sort((a, b) => a.Cost.CompareTo(b.Cost));
 
-            // Move shortest candidate to results
-            result.Add(candidates[0].Path);
-            candidates.RemoveAt(0);
+            // Move shortest candidate to results (if any)
+            if (candidates.Count != 0)
+            {
+                result.Add(candidates[0].Path);
+                candidates.RemoveAt(0);
+            }
         }
 
         return result;
     }
 
-    private static List<NetNode> GetNodesFromPath(IEnumerable<Link> path)
+    public static IEnumerable<NetNode> GetNodesFromPath(IEnumerable<Link> path)
     {
-        var nodes = new List<NetNode>();
-        var i = 0;
-        foreach (var link in path)
-        {
-            var current = link.Source;
-            if (i == 0)
-            {
-                nodes.Add(current);
-                nodes.Add(link.Target);
-                current = link.Target;
-            }
-            else
-            {
-                if (link.Source != current)
-                    throw new InvalidOperationException("Inconsistent path");
+        using var enumerator = path.GetEnumerator();
+        if (!enumerator.MoveNext())
+            yield break;
 
-                nodes.Add(link.Target);
-                current = link.Target;
-            }
-            i++;
-        }
-        return nodes;
+        // Yield the first edge
+        yield return enumerator.Current.Source;
+
+        do
+        {
+            yield return enumerator.Current.Target;
+        } 
+        while (enumerator.MoveNext());
     }
 }

@@ -1,17 +1,15 @@
-using OTN.Core;
-using OTN.Enums;
-using OTN.Extensions;
-using OTN.Interfaces;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using OTN.Core;
+using OTN.Enums;
+using OTN.Extensions;
 
 namespace OTN.Tests;
 
 [TestFixture]
 public class OtnNodeTest
 {
-    private readonly NetNodeType _dummyType = NetNodeType.Terminal;
     private List<AggregationRule> _fullRuleSet = new List<AggregationRule>();
     private List<AggregationRule> _baikalRuleSet = new List<AggregationRule>();
     private List<Func<OtnNode, OtnNode, Signal>> _clientFactory = new List<Func<OtnNode, OtnNode, Signal>>();
@@ -56,7 +54,7 @@ public class OtnNodeTest
 
         Assert.Throws<InvalidOperationException>(() =>
         {
-            var otn = new OtnNode(new NetNode(_dummyType), invalidRules);
+            var otn = new OtnNode(new NetNode(NetNodeType.Terminal), invalidRules);
         });
 
         // Stupid, but...
@@ -69,15 +67,15 @@ public class OtnNodeTest
 
         Assert.DoesNotThrow(() =>
         {
-            var otn = new OtnNode(new NetNode(_dummyType), stupidButOkRule);
+            var otn = new OtnNode(new NetNode(NetNodeType.Terminal), stupidButOkRule);
         });
     }
 
     [Test]
     public void IsAggregationSupported_AssertExpectedResultsForDifferentRuleSets()
     {
-        var baikalNode = new OtnNode(new NetNode(_dummyType), _baikalRuleSet);
-        var fullNode = new OtnNode(new NetNode(_dummyType), _fullRuleSet);
+        var baikalNode = new OtnNode(new NetNode(NetNodeType.Terminal), _baikalRuleSet);
+        var fullNode = new OtnNode(new NetNode(NetNodeType.Terminal), _fullRuleSet);
 
         // Some simple direct checks
         Assert.Multiple(() =>
@@ -91,8 +89,8 @@ public class OtnNodeTest
     [Test]
     public void TryAggregate_AssertHandlesAggregation()
     {
-        var fullNode1 = new OtnNode(new NetNode(_dummyType), _fullRuleSet);
-        var fullNode2 = new OtnNode(new NetNode(_dummyType), _fullRuleSet);
+        var fullNode1 = new OtnNode(new NetNode(NetNodeType.Terminal), _fullRuleSet);
+        var fullNode2 = new OtnNode(new NetNode(NetNodeType.Terminal), _fullRuleSet);
         var s = _clientFactory[0](fullNode1, fullNode2).ToOtnSignal();
 
         // Check for direct aggregation
@@ -106,8 +104,8 @@ public class OtnNodeTest
 
         // Check for random agregation
         var rnd = new Random();
-        var baikalNode1 = new OtnNode(new NetNode(_dummyType), _baikalRuleSet);
-        var baikalNode2 = new OtnNode(new NetNode(_dummyType), _baikalRuleSet);
+        var baikalNode1 = new OtnNode(new NetNode(NetNodeType.Terminal), _baikalRuleSet);
+        var baikalNode2 = new OtnNode(new NetNode(NetNodeType.Terminal), _baikalRuleSet);
         var clients = Enumerable.Range(0, 5)
                                 .Select(i => _clientFactory[rnd.Next(_clientFactory.Count - 1)](baikalNode1, baikalNode2))
                                 .ToList();
@@ -153,8 +151,8 @@ public class OtnNodeTest
         nonExistentBaikalRuleSet.Add(new AggregationRule(OtnLevel.ODU2, OtnLevel.ODU4));
 
         // Check transitive aggregation, where's no direct path
-        var nonExistentBaikal1 = new OtnNode(new NetNode(_dummyType), nonExistentBaikalRuleSet);
-        var nonExistentBaikal2 = new OtnNode(new NetNode(_dummyType), nonExistentBaikalRuleSet);
+        var nonExistentBaikal1 = new OtnNode(new NetNode(NetNodeType.Terminal), nonExistentBaikalRuleSet);
+        var nonExistentBaikal2 = new OtnNode(new NetNode(NetNodeType.Terminal), nonExistentBaikalRuleSet);
 
         var anotherNewSignal = _clientFactory[0](nonExistentBaikal1, nonExistentBaikal2).ToOtnSignal();
         Assert.That(nonExistentBaikal1.TryAggregate(anotherNewSignal, out var aggregated));
@@ -169,8 +167,8 @@ public class OtnNodeTest
     {
         // Line 1xODU2 OTN Node
         var assertId = Guid.Empty;
-        var baikalNode1 = new OtnNode(new NetNode(_dummyType), _baikalRuleSet);
-        var baikalNode2 = new OtnNode(new NetNode(_dummyType), _baikalRuleSet);
+        var baikalNode1 = new OtnNode(new NetNode(NetNodeType.Terminal), _baikalRuleSet);
+        var baikalNode2 = new OtnNode(new NetNode(NetNodeType.Terminal), _baikalRuleSet);
         var aggregation = new Queue<OtnSignal>();
 
         // 4xGE + 4xSTM-1

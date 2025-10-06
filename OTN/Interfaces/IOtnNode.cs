@@ -1,8 +1,7 @@
-﻿using OTN.Core;
-using OTN.Enums;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
+using OTN.Enums;
 
 namespace OTN.Interfaces;
 
