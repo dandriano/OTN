@@ -1,5 +1,5 @@
-﻿using System.Linq;
-using System.Threading.Tasks;
+﻿using System;
+using System.Linq;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Running;
 using OTN.Core;
@@ -11,14 +11,15 @@ namespace OTN.Benchmarks;
 [MemoryDiagnoser]
 public class RoutingBenchmarks
 {
+    private readonly Random _rnd = new Random();
     private Network _network = null!;
     private NetNode _source = null!;
     private NetNode _target = null!;
 
-    [Params(1000)]
+    [Params(35, 100, 250)]
     public int TotalNodes { get; set; }
 
-    [Params(25)]
+    [Params(5, 10)]
     public int BackboneNodes { get; set; }
 
     [Params(2, 3)]
@@ -28,14 +29,15 @@ public class RoutingBenchmarks
     public void Setup()
     {
         _network = NetworkFactory.Create(TotalNodes, BackboneNodes, AverageEdgesPerNode);
-        _source = _network.Optical.Vertices.First();
-        _target = _network.Optical.Vertices.Last();
+        var n = _network.Optical.Vertices.ToList();
+        _source = n[_rnd.Next(n.Count)];
+        _target = n[_rnd.Next(n.Count)];
     }
 
     [Benchmark]
-    public Task FindOpticPathsAsync_Benchmark()
+    public void FindOpticPaths_Benchmark()
     {
-        return _network.FindOpticPathsAsync(_source, _target, k: 10);
+        _network.Optical.FindOpticPaths(_source, _target);
     }
 }
 

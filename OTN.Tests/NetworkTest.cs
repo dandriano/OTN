@@ -21,9 +21,8 @@ public class NetworkTest
     {
         var source = _network.Optical.Vertices.First();
         var target = _network.Optical.Vertices.Last();
-        var paths = _network.FindOpticPathsAsync(source, target);
 
-        Assert.DoesNotThrowAsync(async () => await paths);
+        Assert.DoesNotThrow(() => _network.Optical.FindOpticPaths(source, target));
 
         // Not guaranteed
         // Assert.That(paths, Is.Not.Null);
