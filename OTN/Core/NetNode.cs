@@ -11,7 +11,12 @@ public class NetNode : INetNode
 {
     public Guid Id { get; init; } = Guid.NewGuid();
     public NetNodeType Type { get; private set; }
-    public RouteNodeType RoutingType { get; private set; } = RouteNodeType.Undefined;
+    public RouteNodeType RoutingRole { get; private set; } = RouteNodeType.Undefined;
+
+    public NetNode(NetNodeType type, RouteNodeType routeRole) : this(type)
+    {
+        RoutingRole = routeRole;
+    }
 
     public NetNode(NetNodeType type)
     {

@@ -8,13 +8,13 @@ namespace OTN.Utils;
 
 public static class NetworkFactory
 {
-    public static Network Create(int totalNodes, int backboneNodes, int avgEdgesPerNode)
+    public static Network Create(int totalNodes, int backboneNodes, int avgEdgesPerNode, int mustPassNodes = 0, int mustAvoidNodes = 0)
     {
-        var network = new Network(CreateMagistralNetworkGraph(totalNodes, backboneNodes, avgEdgesPerNode));
+        var network = new Network(CreateMagistralNetworkGraph(totalNodes, backboneNodes, avgEdgesPerNode, mustPassNodes, mustAvoidNodes));
 
         return network;
     }
-    public static BidirectionalGraph<NetNode, Link> CreateMagistralNetworkGraph(int totalNodes, int backboneNodes, int avgEdgesPerNode)
+    public static BidirectionalGraph<NetNode, Link> CreateMagistralNetworkGraph(int totalNodes, int backboneNodes, int avgEdgesPerNode, int mustPassNodes = 0, int mustAvoidNodes = 0)
     {
         var graph = new BidirectionalGraph<NetNode, Link>();
         var nodes = new List<NetNode>();
@@ -24,16 +24,30 @@ public static class NetworkFactory
 
         // Create nodes
         for (int i = 0; i < totalNodes; i++)
-            nodes.Add(new NetNode(NetNodeType.Terminal));
-
+        {
+            if (mustPassNodes > 0)
+            {
+                mustPassNodes--;
+                nodes.Add(new NetNode(NetNodeType.Terminal, RouteNodeType.InRoute));
+            }
+            else if (mustAvoidNodes > 0)
+            {
+                mustAvoidNodes--;
+                nodes.Add(new NetNode(NetNodeType.OLA, RouteNodeType.OutRoute));
+            }
+            else
+            {
+                nodes.Add(new NetNode(NetNodeType.ROADM));
+            }
+        }
+            
         var rand = new Random();
-
         // Connect backbone nodes densely (full mesh or near-full)
         for (int i = 0; i < backboneNodes; i++)
         {
             for (int j = i + 1; j < backboneNodes; j++)
             {
-                var w = rand.NextDouble() * 10 + 1;
+                var w = Math.Max(60, rand.NextDouble() * 200);
                 var link = new Link(nodes[i], nodes[j], w);
                 graph.AddVerticesAndEdge(link);
 
@@ -67,7 +81,7 @@ public static class NetworkFactory
 
                 if (connectTo != nodes[i])
                 {
-                    var w = rand.NextDouble() * 10 + 1;
+                    var w = Math.Max(60, rand.NextDouble() * 200);
                     var link = new Link(nodes[i], connectTo, w);
                     graph.AddVerticesAndEdge(link);
 

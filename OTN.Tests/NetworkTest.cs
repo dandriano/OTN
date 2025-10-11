@@ -22,7 +22,7 @@ public class NetworkTest
         var source = _network.Optical.Vertices.First();
         var target = _network.Optical.Vertices.Last();
 
-        Assert.DoesNotThrow(() => _network.Optical.FindOpticPaths(source, target));
+        Assert.DoesNotThrow(() => _network.Optical.FindOpticPath(source, target));
 
         // Not guaranteed
         // Assert.That(paths, Is.Not.Null);
