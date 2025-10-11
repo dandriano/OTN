@@ -22,4 +22,14 @@ public class NetNode : INetNode
     {
         Type = type;
     }
+
+    public void SetRouteRole(RouteNodeType role)
+    {
+        RoutingRole = role;
+    }
+
+    public override string ToString()
+    {
+        return Id.ToString()[..5];
+    }
 }

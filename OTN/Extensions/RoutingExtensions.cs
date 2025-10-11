@@ -42,10 +42,11 @@ public static class RoutingExtensions
     {
         var dijkstra = graph.ShortestPathsDijkstra(CalculateLength, source);
         if (!dijkstra(target, out var path))
-            return new List<List<Link>>();
+            throw new NoPathFoundException($"No path between {source}/{target}");
 
         var result = new List<List<Link>>() { path!.ToList() };
         var candidates = new List<(double Cost, List<Link> Path)>();
+        var removedNodes = new List<NetNode>();
 
         for (int i = 2; i <= k; i++)
         {
@@ -66,8 +67,8 @@ public static class RoutingExtensions
                         removedEdges.Add(p[spurIdx].Id);
                 }
 
-                Func<Link, double> weight = e => removedEdges.Contains(e.Id) ? float.PositiveInfinity : e.CalculateLength();
-
+                Func<Link, double> weight = e => removedEdges.Contains(e.Id) ? double.PositiveInfinity : e.CalculateLength();
+                dijkstra = graph.ShortestPathsDijkstra(weight, source);
                 if (!dijkstra(target, out var spurPath))
                     continue;
 
@@ -81,10 +82,22 @@ public static class RoutingExtensions
             // Move shortest candidate to results (if any)
             if (candidates.Count != 0)
             {
+                foreach (var n in GetNodesFromPath(candidates[0].Path)
+                    .Where(n => n.Id != source.Id && n.Id != target.Id))
+                {
+                    removedNodes.Add(n);
+                    n.SetRouteRole(RouteNodeType.OutRoute);
+                }
+
                 result.Add(candidates[0].Path);
-                candidates.RemoveAt(0);
+                candidates = candidates
+                    .Where(p => GetNodesFromPath(p.Path).All(n => n.RoutingRole != RouteNodeType.OutRoute))
+                    .ToList();
             }
         }
+
+        foreach (var n in removedNodes)
+            n.SetRouteRole(RouteNodeType.Undefined);
 
         return result;
     }
@@ -163,7 +176,7 @@ public static class RoutingExtensions
             var to = nodes[i + 1];
 
             if (!graph.ShortestPathsDijkstra(weight, from)(to, out var pathEdges))
-                return new List<Link>();
+                throw new NoPathFoundException($"No path between {source}/{target}");
 
             result.AddRange(pathEdges);
         }

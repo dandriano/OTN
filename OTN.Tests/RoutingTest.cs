@@ -1,15 +1,7 @@
-﻿using System;
-using System.Linq;
-using BenchmarkDotNet.Attributes;
-using BenchmarkDotNet.Running;
-using OTN.Core;
-using OTN.Extensions;
-using OTN.Utils;
-
+﻿/*
 namespace OTN.Benchmarks;
 
 [TestFixture]
-[Ignore("Benchmarks")]
 public class RoutingTest
 {
     [Test]
@@ -28,7 +20,7 @@ public class RoutingTest
 }
 
 [MemoryDiagnoser]
-internal class KPathRoutingBenchmark
+public class KPathRoutingBenchmark
 {
     private readonly Random _rnd = new Random();
     private Network _network = null!;
@@ -59,7 +51,7 @@ internal class KPathRoutingBenchmark
 }
 
 [MemoryDiagnoser]
-internal class NNRoutingBenchmark
+public class NNRoutingBenchmark
 {
     private readonly Random _rnd = new Random();
     private Network _network = null!;
@@ -73,9 +65,9 @@ internal class NNRoutingBenchmark
     [Params(2, 3)]
     public int AverageEdgesPerNode { get; set; }
     [Params(5)]
-    public int MustAvoidNodes { get; private set; }
+    public int MustAvoidNodes { get; set; }
     [Params(4)]
-    public int MustPassNodes { get; private set; }
+    public int MustPassNodes { get; set; }
 
     [GlobalSetup]
     public void Setup()
@@ -92,3 +84,4 @@ internal class NNRoutingBenchmark
         _network.Optical.FindMustPassOpticPath(_source, _target);
     }
 }
+*/
