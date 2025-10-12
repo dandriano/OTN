@@ -160,6 +160,11 @@ public class OtnNodeTest
         Assert.That(aggregated!.OduLevel, Is.EqualTo(OtnLevel.ODU4));
         Assert.That(aggregated.Signals.Single().OduLevel, Is.EqualTo(OtnLevel.ODU2));
         Assert.That(aggregated.Signals.Single().Signals.Single().OduLevel, Is.EqualTo(OtnLevel.ODU0));
+
+        // Ok, new empty node
+        var emotyNode = new OtnNode(new NetNode(NetNodeType.Terminal), _baikalRuleSet);
+        // but no more
+        Assert.That(!emotyNode.TryAggregate(newSignal, out var _ ,dontCreateAggregated: true));
     }
 
     [Test]

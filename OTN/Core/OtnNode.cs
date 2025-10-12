@@ -107,7 +107,7 @@ public class OtnNode : IOtnNode
     }
 
     /// <inheritdoc />
-    public bool TryAggregate(OtnSignal client, [NotNullWhen(true)] out OtnSignal? aggregated, AggregationStrategy strategy = AggregationStrategy.NextFit)
+    public bool TryAggregate(OtnSignal client, [NotNullWhen(true)] out OtnSignal? aggregated, AggregationStrategy strategy = AggregationStrategy.NextFit, bool dontCreateAggregated = false)
     {
         AggregationSelector selector = strategy switch
         {
@@ -118,7 +118,7 @@ public class OtnNode : IOtnNode
             _ => throw new ArgumentOutOfRangeException(nameof(strategy))
         };
 
-        return TryAggregate(client, out aggregated, selector);
+        return TryAggregate(client, out aggregated, selector, dontCreateAggregated);
     }
 
     /// <summary>
@@ -130,8 +130,9 @@ public class OtnNode : IOtnNode
     /// <param name="client">The client OTN signal to add.</param>
     /// <param name="aggregated">The aggregation result</param>
     /// <param name="selector">The delegate to select a fitting container.</param>
+    /// <param name="dontCreateAggregated">The flag to limit aggregation to existing container signals.</param>
     /// <returns><c>true</c> if the client signal was successfully aggregated; otherwise, <c>false</c>.</returns>
-    public bool TryAggregate(OtnSignal client, [NotNullWhen(true)] out OtnSignal? aggregated, AggregationSelector selector)
+    public bool TryAggregate(OtnSignal client, [NotNullWhen(true)] out OtnSignal? aggregated, AggregationSelector selector, bool dontCreateAggregated = false)
     {
         aggregated = null;
         var targetLevel = _rules.Select(r => r.ContainerType).Max();
@@ -159,7 +160,7 @@ public class OtnNode : IOtnNode
             return true;
         }
         // Assume we have path to the highest OTN level rule
-        if (!IsAggregationSupportedTransitive(client.OduLevel, targetLevel, out var containerLevel))
+        if (!IsAggregationSupportedTransitive(client.OduLevel, targetLevel, out var containerLevel) || dontCreateAggregated)
             return false;
 
         // Create new container signal to hold client
