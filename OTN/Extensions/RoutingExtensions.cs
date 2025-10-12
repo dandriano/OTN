@@ -45,20 +45,20 @@ public static class RoutingExtensions
             throw new NoPathFoundException($"No path between {source}/{target}");
 
         var result = new List<List<Link>>() { path!.ToList() };
-        var candidates = new List<(double Cost, List<Link> Path)>();
-        var removedNodes = new List<NetNode>();
+        var candidates = new PriorityQueue<List<Link>, double>();
 
         for (int i = 2; i <= k; i++)
         {
             var lastPath = result[^1];
             var lastNodes = GetNodesFromPath(lastPath).ToList();
-            var candidateCount = candidates.Count;
+
             for (int spurIdx = 0; spurIdx < lastNodes.Count - 1; spurIdx++)
             {
                 var spurNode = lastNodes[spurIdx];
                 var rootNodes = lastNodes.GetRange(0, spurIdx + 1);
                 var rootEdges = lastPath.Take(spurIdx).ToList();
 
+                // Identify deviation edges from previous paths sharing the prefix
                 var removedEdges = new HashSet<Guid>();
                 foreach (var p in result)
                 {
@@ -67,37 +67,46 @@ public static class RoutingExtensions
                         removedEdges.Add(p[spurIdx].Id);
                 }
 
-                Func<Link, double> weight = e => removedEdges.Contains(e.Id) ? double.PositiveInfinity : e.CalculateLength();
-                dijkstra = graph.ShortestPathsDijkstra(weight, source);
-                if (!dijkstra(target, out var spurPath))
-                    continue;
-
-                candidates.Add((spurPath.Sum(p => p.CalculateLength()), spurPath.ToList()));
-            }
-
-            // Sort candidates (if changed)
-            if (candidateCount != candidates.Count)
-                candidates.Sort((a, b) => a.Cost.CompareTo(b.Cost));
-
-            // Move shortest candidate to results (if any)
-            if (candidates.Count != 0)
-            {
-                foreach (var n in GetNodesFromPath(candidates[0].Path)
-                    .Where(n => n.Id != source.Id && n.Id != target.Id))
+                // Temporarily set prefix nodes (except spurNode) to OutRoute to prevent using them in spur path
+                var tempOutNodes = new List<NetNode>();
+                for (int j = 0; j < spurIdx; j++)
                 {
-                    removedNodes.Add(n);
-                    n.SetRouteRole(RouteNodeType.OutRoute);
+                    var node = lastNodes[j];
+                    if (node.RoutingRole != RouteNodeType.OutRoute)
+                    {
+                        node.SetRouteRole(RouteNodeType.OutRoute);
+                        tempOutNodes.Add(node);
+                    }
                 }
 
-                result.Add(candidates[0].Path);
-                candidates = candidates
-                    .Where(p => GetNodesFromPath(p.Path).All(n => n.RoutingRole != RouteNodeType.OutRoute))
-                    .ToList();
-            }
-        }
+                try
+                {
+                    Func<Link, double> weight = e => removedEdges.Contains(e.Id) ? double.PositiveInfinity : e.CalculateLength();
 
-        foreach (var n in removedNodes)
-            n.SetRouteRole(RouteNodeType.Undefined);
+                    // Run Dijkstra from spurNode to target
+                    dijkstra = graph.ShortestPathsDijkstra(weight, spurNode);
+                    if (!dijkstra(target, out var spurPath))
+                        continue;
+
+                    var fullPath = rootEdges.Concat(spurPath!).ToList();
+                    var cost = fullPath.Sum(e => e.Tag);
+                    candidates.Enqueue(fullPath, cost);
+                }
+                finally
+                {
+                    foreach (var node in tempOutNodes)
+                        node.SetRouteRole(RouteNodeType.Undefined);
+                }
+            }
+
+            // If no candidates, cannot find more paths
+            if (candidates.Count == 0)
+                break;
+
+            // Add the shortest candidate to result
+            var nextPath = candidates.Dequeue();
+            result.Add(nextPath);
+        }
 
         return result;
     }

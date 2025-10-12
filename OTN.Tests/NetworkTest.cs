@@ -44,7 +44,7 @@ public class NetworkTest
     }
     
     [Test]
-    public void FindOpticPathsAsync_AssertPathUniq()
+    public void FindOpticPathsAsync_AssertPathUnique()
     {
         var rnd = new Random();
         var n = _network.Optical.Vertices.ToArray();
@@ -61,17 +61,10 @@ public class NetworkTest
         var bestRoute = routes[0];
 
         Assert.That(targetRoute.SequenceEqual(bestRoute));
-        Assert.That(routes.Skip(1).All(r => !r.SequenceEqual(bestRoute)));
-
-        var uniqNodes = new Dictionary<Guid, NetNode>();
-        foreach (var route in routes)
+        for (var i = 0; i < routes.Count - 1; i++)
         {
-            foreach (var node in RoutingExtensions.GetNodesFromPath(route)
-                        .Where(n => n.Id != source.Id && n.Id != target.Id))
-            {
-                Assert.That(uniqNodes.ContainsKey(node.Id));
-                uniqNodes.Add(node.Id, node);
-            }
+            var currentRoute = routes[i];
+            Assert.That(routes.Skip(i + 1).All(r => !r.SequenceEqual(currentRoute)));
         }
     }
 }
