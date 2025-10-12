@@ -12,6 +12,8 @@ namespace OTN.Core;
 /// </summary>
 public class Network
 {
+    private readonly List<Requirement<NetNode>> _requirements
+        = new List<Requirement<NetNode>>();
     private readonly Dictionary<Guid, OtnSignal> _signalMap
         = new Dictionary<Guid, OtnSignal>();
 
@@ -81,6 +83,7 @@ public class Network
         else if (!(Electrical.ContainsVertex(signal.Source) && Electrical.ContainsVertex(signal.Target)))
             throw new InvalidOperationException();
 
+        // TODO: use _requirements to decide aggregation
         var s = signal.ToOtnSignal();
         if (!(s.Source.TryAggregate(s, out var aggregated, strategy) && s.Target.TryAggregate(aggregated, out _, strategy)))
             throw new InvalidOperationException();
