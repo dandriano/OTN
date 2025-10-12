@@ -19,7 +19,6 @@ public interface IOtnNode
     /// HO OTN signals
     /// </summary>
     IEnumerable<IOtnSignal> Signals { get; }
-    int SignalCount { get; }
     /// <summary>
     /// Determines whether aggregation is supported for a given client and container OTN level based on the node's rules.
     /// </summary>

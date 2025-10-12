@@ -45,14 +45,19 @@ public static class RoutingExtensions
             throw new NoPathFoundException($"No path between {source}/{target}");
 
         var result = new List<List<Link>>() { path!.ToList() };
+        var resultNodes = new List<List<NetNode>> { GetNodesFromPath(result[0]).ToList() };
         var candidates = new PriorityQueue<List<Link>, double>();
+        var signatures = new HashSet<string>
+        {
+            string.Join(">", resultNodes[0].Select(n => n.Id))
+        };
 
-        for (int i = 2; i <= k; i++)
+        for (var i = 2; i <= k; i++)
         {
             var lastPath = result[^1];
-            var lastNodes = GetNodesFromPath(lastPath).ToList();
+            var lastNodes = resultNodes[^1];
 
-            for (int spurIdx = 0; spurIdx < lastNodes.Count - 1; spurIdx++)
+            for (var spurIdx = 0; spurIdx < lastNodes.Count - 1; spurIdx++)
             {
                 var spurNode = lastNodes[spurIdx];
                 var rootNodes = lastNodes.GetRange(0, spurIdx + 1);
@@ -60,11 +65,11 @@ public static class RoutingExtensions
 
                 // Identify deviation edges from previous paths sharing the prefix
                 var removedEdges = new HashSet<Guid>();
-                foreach (var p in result)
+                for (var rIdx = 0; rIdx < result.Count; rIdx++)
                 {
-                    var pNodes = GetNodesFromPath(p).ToList();
+                    var pNodes = resultNodes[rIdx];
                     if (pNodes.Count > spurIdx + 1 && pNodes.GetRange(0, spurIdx + 1).SequenceEqual(rootNodes))
-                        removedEdges.Add(p[spurIdx].Id);
+                        removedEdges.Add(result[rIdx][spurIdx].Id);
                 }
 
                 // Temporarily set prefix nodes (except spurNode) to OutRoute to prevent using them in spur path
@@ -90,7 +95,9 @@ public static class RoutingExtensions
 
                     var fullPath = rootEdges.Concat(spurPath!).ToList();
                     var cost = fullPath.Sum(e => e.Tag);
-                    candidates.Enqueue(fullPath, cost);
+                    var signature = string.Join(">", GetNodesFromPath(fullPath).Select(n => n.Id));
+                    if (signatures.Add(signature))
+                        candidates.Enqueue(fullPath, cost);
                 }
                 finally
                 {
@@ -106,6 +113,7 @@ public static class RoutingExtensions
             // Add the shortest candidate to result
             var nextPath = candidates.Dequeue();
             result.Add(nextPath);
+            resultNodes.Add(GetNodesFromPath(nextPath).ToList());
         }
 
         return result;

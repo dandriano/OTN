@@ -38,18 +38,14 @@ public class OtnNode : IOtnNode
 {
     private readonly int _capacity;
     private readonly IOtnSettings _settings;
-    private readonly List<AggregationRule> _rules
-        = new List<AggregationRule>();
-    private readonly Dictionary<Guid, OtnSignal> _signals
-        = new Dictionary<Guid, OtnSignal>();
+    private readonly List<AggregationRule> _rules = new List<AggregationRule>();
+    private readonly Dictionary<Guid, OtnSignal> _signals = new Dictionary<Guid, OtnSignal>();
 
     public Guid Id { get; } = Guid.NewGuid();
     public INetNode NetNode { get; }
     /// <inheritdoc />
     public IEnumerable<IOtnSignal> Signals => _signals.Values;
-    public int SignalCount => _signals.Count;
     /// <inheritdoc />
-
     /// <summary>
     /// Initializes a new instance of the <see cref="OtnNode"/> class 
     /// with aggregation rules and optional initial capacity.

@@ -14,6 +14,5 @@ public interface IOtnSignal : ISignal, IEdge<IOtnNode>
     /// LO and intermediate OTN signal aggregation
     /// </summary>
     IEnumerable<IOtnSignal> Signals { get; }
-    int SignalCount { get; }
     OtnLevel OduLevel { get; }
 }

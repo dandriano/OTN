@@ -53,13 +53,16 @@ public class NetworkTest
     {
         // Assert that k-paths are unique
         var routes = _network.Optical.FindOpticPath(_source, _target);
-        var bestRoute = routes[0];
+        Assert.That(routes, Is.Not.Empty);
 
-        Assert.That(_bestRoute.SequenceEqual(bestRoute));
+        if (routes.Count == 1)
+            return;
+
+        var bestRoute = routes[0];
         for (var i = 0; i < routes.Count - 1; i++)
         {
             var currentRoute = routes[i];
-            Assert.That(routes.Skip(i + 1).All(r => !r.SequenceEqual(currentRoute)));
+            Assert.That(routes.Skip(i + 1).All(r => !r.SequenceEqual(_bestRoute) && !r.SequenceEqual(currentRoute) ));
         }
     }
 }

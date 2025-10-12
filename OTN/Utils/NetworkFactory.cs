@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using OTN.Core;
 using OTN.Enums;
 using QuikGraph;
@@ -14,16 +15,22 @@ public static class NetworkFactory
 
         return network;
     }
+
     public static BidirectionalGraph<NetNode, Link> CreateMagistralNetworkGraph(int totalNodes, int backboneNodes, int avgEdgesPerNode, int mustPassNodes = 0, int mustAvoidNodes = 0)
     {
+        if (totalNodes < 0 || backboneNodes < 0 || mustPassNodes < 0 || mustAvoidNodes < 0 || avgEdgesPerNode < 0)
+            throw new ArgumentException("Input parameters cannot be negative.");
+        if (mustPassNodes + mustAvoidNodes > totalNodes)
+            throw new ArgumentException("Too many must-pass or must-avoid nodes.");
+
         var graph = new BidirectionalGraph<NetNode, Link>();
         var nodes = new List<NetNode>();
 
         if (backboneNodes > totalNodes)
-            backboneNodes = totalNodes / 10; // limit backbone nodes
+            backboneNodes = Math.Max(1, totalNodes / 10); // limit backbone nodes
 
         // Create nodes
-        for (int i = 0; i < totalNodes; i++)
+        for (var i = 0; i < totalNodes; i++)
         {
             if (mustPassNodes > 0)
             {
@@ -40,18 +47,18 @@ public static class NetworkFactory
                 nodes.Add(new NetNode(NetNodeType.ROADM));
             }
         }
-            
+
         var rand = new Random();
         // Connect backbone nodes densely (full mesh or near-full)
-        for (int i = 0; i < backboneNodes; i++)
+        for (var i = 0; i < backboneNodes; i++)
         {
-            for (int j = i + 1; j < backboneNodes; j++)
+            for (var j = i + 1; j < backboneNodes; j++)
             {
                 var w = Math.Max(60, rand.NextDouble() * 200);
                 var link = new Link(nodes[i], nodes[j], w);
                 graph.AddVerticesAndEdge(link);
 
-                var reverseLink = new Link(nodes[j], nodes[j], w);
+                var reverseLink = new Link(nodes[j], nodes[i], w);
                 graph.AddEdge(reverseLink);
 
                 link.SetReverse(reverseLink);
@@ -60,11 +67,11 @@ public static class NetworkFactory
         }
 
         // Connect other nodes sparsely to random backbone or close neighbors
-        for (int i = backboneNodes; i < totalNodes; i++)
+        for (var i = backboneNodes; i < totalNodes; i++)
         {
-            int connections = Math.Max(1, rand.Next(avgEdgesPerNode)); // at least 1 connection
+            var connections = Math.Max(1, rand.Next(avgEdgesPerNode)); // at least 1 connection
 
-            for (int c = 0; c < connections; c++)
+            for (var c = 0; c < connections; c++)
             {
                 // Connect either to a backbone node (hotspot) or a neighbor node in range
                 NetNode connectTo;
@@ -75,7 +82,7 @@ public static class NetworkFactory
                 else
                 {
                     // Connect to a node close by index for locality
-                    int neighborIdx = Math.Max(backboneNodes, Math.Min(totalNodes - 1, i + rand.Next(-5, 6)));
+                    var neighborIdx = Math.Max(backboneNodes, Math.Min(totalNodes - 1, i + rand.Next(-5, 6)));
                     connectTo = nodes[neighborIdx];
                 }
 
@@ -85,8 +92,9 @@ public static class NetworkFactory
                     var link = new Link(nodes[i], connectTo, w);
                     graph.AddVerticesAndEdge(link);
 
-                    if (rand.Next(2) == 0)
-                        continue;
+                    // commented out to enforce symmetry
+                    // if (rand.Next(2) == 0)
+                    //    continue;
 
                     var reverseLink = new Link(connectTo, nodes[i], w);
                     graph.AddEdge(reverseLink);

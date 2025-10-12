@@ -126,7 +126,7 @@ public class OtnNodeTest
             }
         }
 
-        Assert.That(baikalNode1.SignalCount, Is.EqualTo(1));  // in OTN Node capacity by default
+        Assert.That(baikalNode1.Signals.Count(), Is.EqualTo(1));  // in OTN Node capacity by default
 
         // Let's "fill" a remainning space of the OTN signal with aggregation
         // of STM-1
@@ -143,7 +143,7 @@ public class OtnNodeTest
 
         // No more
         var newSignal = _clientFactory[rnd.Next(_clientFactory.Count - 1)](baikalNode1, baikalNode2).ToOtnSignal();
-        Assert.That(baikalNode1.SignalCount, Is.EqualTo(1));  // in OTN Node capacity by default
+        Assert.That(baikalNode1.Signals.Count(), Is.EqualTo(1));  // in OTN Node capacity by default
         Assert.That(!baikalNode1.TryAggregate(newSignal, out _));
 
         // Ok, let's assume that baikal could aggregate up to ODU4/100G
@@ -210,7 +210,7 @@ public class OtnNodeTest
         }
 
         // No less
-        Assert.That(baikalNode1.SignalCount, Is.Zero);
-        Assert.That(baikalNode2.SignalCount, Is.Zero);
+        Assert.That(baikalNode1.Signals.Count(), Is.Zero);
+        Assert.That(baikalNode2.Signals.Count(), Is.Zero);
     }
 }
