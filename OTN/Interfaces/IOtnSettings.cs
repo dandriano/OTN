@@ -19,7 +19,7 @@ public interface IOtnSettings
     {
         OtnLevel.ODU1 => 2,
         OtnLevel.ODU2 => 8,
-        OtnLevel.ODU3 => 32,
+        OtnLevel.ODU3 => 32,    // pre-2012 for simplicity
         OtnLevel.ODU4 => 80,
         _ => 0
     };
