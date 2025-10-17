@@ -16,11 +16,16 @@ public static class NetworkFactory
     }
     public static BidirectionalGraph<NetNode, Link> CreateMagistralNetworkGraph(int totalNodes, int backboneNodes, int avgEdgesPerNode, int mustPassNodes = 0, int mustAvoidNodes = 0)
     {
+    if (totalNodes < 0 || backboneNodes < 0 || mustPassNodes < 0 || mustAvoidNodes < 0 || avgEdgesPerNode < 0)
+        throw new ArgumentException("Input parameters cannot be negative.");
+    if (mustPassNodes + mustAvoidNodes > totalNodes)
+        throw new ArgumentException("Too many must-pass or must-avoid nodes.");
+            
         var graph = new BidirectionalGraph<NetNode, Link>();
         var nodes = new List<NetNode>();
 
         if (backboneNodes > totalNodes)
-            backboneNodes = totalNodes / 10; // limit backbone nodes
+            backboneNodes = Math.Max(1, totalNodes / 10); // limit backbone nodes
 
         // Create nodes
         for (int i = 0; i < totalNodes; i++)
@@ -51,7 +56,7 @@ public static class NetworkFactory
                 var link = new Link(nodes[i], nodes[j], w);
                 graph.AddVerticesAndEdge(link);
 
-                var reverseLink = new Link(nodes[j], nodes[j], w);
+                var reverseLink = new Link(nodes[j], nodes[i], w);
                 graph.AddEdge(reverseLink);
 
                 link.SetReverse(reverseLink);
@@ -85,8 +90,9 @@ public static class NetworkFactory
                     var link = new Link(nodes[i], connectTo, w);
                     graph.AddVerticesAndEdge(link);
 
-                    if (rand.Next(2) == 0)
-                        continue;
+                    // commented out to enforce symmetry
+                    // if (rand.Next(2) == 0)
+                    //    continue;
 
                     var reverseLink = new Link(connectTo, nodes[i], w);
                     graph.AddEdge(reverseLink);
