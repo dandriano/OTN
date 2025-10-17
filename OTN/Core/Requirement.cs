@@ -2,20 +2,22 @@ using OTN.Interfaces;
 
 namespace OTN.Core;
 
-public class Requirement<T> where T : INetNode
+public class Requirement<T, TWeight>  // maybe ITaggedEdge<NetNode, double> or ITaggedEdge<OtnNode, int>
+    where T : INetNode
+    where TWeight : struct
 {
     public T Source { get; }
     public T Target { get; }
-    public double BandwidthGbps { get; }
-    public int FiberCount { get; }
+    public TWeight Tag { get; }
+    public int TagCount { get; }
     public string Notes { get; }
 
-    public Requirement(T source, T target, double bandwidthGbps, int fiberCount = 2, string notes = "")
+    public Requirement(T source, T target, TWeight weight, int weightCount = 2, string notes = "")
     {
         Source = source;
         Target = target;
-        BandwidthGbps = bandwidthGbps;
-        FiberCount = fiberCount;
+        Tag = weight;
+        TagCount = weightCount;
         Notes = notes;
     }
 }

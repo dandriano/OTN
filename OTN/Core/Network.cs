@@ -12,8 +12,8 @@ namespace OTN.Core;
 /// </summary>
 public class Network
 {
-    private readonly List<Requirement<NetNode>> _requirements
-        = new List<Requirement<NetNode>>();
+    private readonly List<Requirement<NetNode, double>> _requirements
+        = new List<Requirement<NetNode, double>>();
     private readonly Dictionary<Guid, OtnSignal> _signalMap
         = new Dictionary<Guid, OtnSignal>();
 
