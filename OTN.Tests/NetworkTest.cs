@@ -19,7 +19,7 @@ public class NetworkTest
     [OneTimeSetUp]
     public void OneTimeSetup()
     {
-        _network = NetworkFactory.Create(NetworkFactory.CreateMagistralNetworkRequirements(35, 5, 3)); // NetworkFactory.Create(35, 5, 3);
+        _network = NetworkFactory.Create(35, 5, 3);
         
         var rnd = new Random();
         var n = _network.Optical.Vertices.ToArray();
