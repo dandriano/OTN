@@ -41,18 +41,16 @@ public class Network
     public ILink AddLink(NetNode source, NetNode target, double length, LinkType linkType = LinkType.Undirected)
     {
         var l = new Link(source, target, length, linkType);
-        Link reverse = null!;
-        if (linkType == LinkType.Undirected)
-        {
-            reverse = new Link(target, source, length, linkType);
-            l.SetReverse(reverse);
-            reverse.SetReverse(l);
-        }
-
         if (!Optical.AddEdge(l))
             throw new InvalidOperationException();
-        else if (linkType == LinkType.Undirected && !Optical.AddEdge(l.Reverse!))
-            throw new InvalidOperationException();
+
+        if (linkType == LinkType.Undirected)
+        {
+            var r = new Link(l);
+            if (!Optical.AddEdge(r))
+                throw new InvalidOperationException();
+        }
+
         return l;
     }
 

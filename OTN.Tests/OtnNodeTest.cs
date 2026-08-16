@@ -213,4 +213,46 @@ public class OtnNodeTest
         Assert.That(baikalNode1.Signals.Count(), Is.Zero);
         Assert.That(baikalNode2.Signals.Count(), Is.Zero);
     }
+
+    [Test]
+    public void TryAggregate_TopLevelContainerMustTerminateAtNode()
+    {
+        var fullRuleSet = _fullRuleSet;
+
+        var nodeA = new OtnNode(new NetNode(NetNodeType.Terminal), fullRuleSet);
+        var nodeB = new OtnNode(new NetNode(NetNodeType.Terminal), fullRuleSet);
+        var nodeC = new OtnNode(new NetNode(NetNodeType.Terminal), fullRuleSet);
+
+        // Build a top-level aggregated container between A and B.
+        // We intentionally aggregate from B so that B gets the container stored.
+        var client = _clientFactory[0](nodeA, nodeB).ToOtnSignal();
+        Assert.That(nodeB.TryAggregate(client, out var hoBetweenAandB));
+        Assert.That(hoBetweenAandB!.OduLevel, Is.EqualTo(OtnLevel.ODU4));
+        Assert.That(hoBetweenAandB.SignalCount, Is.EqualTo(1));
+
+        // Node C should not accept a container that doesn't terminate at C.
+        Assert.That(!nodeC.TryAggregate(hoBetweenAandB!, out _));
+    }
+
+    [Test]
+    public void TryAggregate_DontCreateAggregatedBlocksTopLevelStore()
+    {
+        var fullRuleSet = _fullRuleSet;
+
+        var nodeA = new OtnNode(new NetNode(NetNodeType.Terminal), fullRuleSet);
+        var nodeB = new OtnNode(new NetNode(NetNodeType.Terminal), fullRuleSet);
+
+        // Build a top-level aggregated container between A and B.
+        // We aggregate from B so that A stays empty.
+        var client = _clientFactory[0](nodeA, nodeB).ToOtnSignal();
+        Assert.That(nodeB.TryAggregate(client, out var hoBetweenAandB));
+        Assert.That(hoBetweenAandB!.OduLevel, Is.EqualTo(OtnLevel.ODU4));
+
+        // A offered a prebuilt top-level container, but must not store/create it.
+        Assert.That(!nodeA.TryAggregate(hoBetweenAandB!, out _, dontCreateAggregated: true));
+
+        // Without the restriction, A should accept it.
+        Assert.That(nodeA.TryAggregate(hoBetweenAandB!, out var stored));
+        Assert.That(stored!.Id, Is.EqualTo(hoBetweenAandB!.Id));
+    }
 }

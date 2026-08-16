@@ -57,12 +57,7 @@ public static class NetworkFactory
                 var w = Math.Max(60, rand.NextDouble() * 200);
                 var link = new Link(nodes[i], nodes[j], w);
                 graph.AddVerticesAndEdge(link);
-
-                var reverseLink = new Link(nodes[j], nodes[i], w);
-                graph.AddEdge(reverseLink);
-
-                link.SetReverse(reverseLink);
-                reverseLink.SetReverse(link);
+                graph.AddEdge(new Link(link));
             }
         }
 
@@ -91,16 +86,7 @@ public static class NetworkFactory
                     var w = Math.Max(60, rand.NextDouble() * 200);
                     var link = new Link(nodes[i], connectTo, w);
                     graph.AddVerticesAndEdge(link);
-
-                    // commented out to enforce symmetry
-                    // if (rand.Next(2) == 0)
-                    //    continue;
-
-                    var reverseLink = new Link(connectTo, nodes[i], w);
-                    graph.AddEdge(reverseLink);
-
-                    link.SetReverse(reverseLink);
-                    reverseLink.SetReverse(link);
+                    graph.AddEdge(new Link(link));
                 }
             }
         }

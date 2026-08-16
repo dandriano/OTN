@@ -135,17 +135,39 @@ public class OtnNode : IOtnNode
         // Aggregating another HO signal?
         if (targetLevel == client.OduLevel && client.SignalCount != 0)
         {
+            // Only accept containers that actually terminate at this node.
+            // (Source/Target are OtnNode instances, so reference equality is intended.)
+            if (!ReferenceEquals(client.Source, this) && !ReferenceEquals(client.Target, this))
+                return false;
+
+            // Validate container consistency against this node's slot model.
+            // Note: capacity is computed from *immediate* children (same logic as OtnSignal.CanAggregate).
+            const double tolerance = 0.001;
+            var expectedBandwidth = client.OduLevel.ExpectedBandwidthGbps();
+            if (Math.Abs(client.BandwidthGbps - expectedBandwidth) > tolerance)
+                return false;
+
+            var usedSlots = client.Signals.Sum(s => _settings.SlotsRequired(s.OduLevel));
+            if (usedSlots > _settings.SlotsAvailable(client.OduLevel))
+                return false;
+
             if (_signals.TryGetValue(client.Id, out aggregated))
             {
-                // Is it already there?
+                // Is it already there? (don'tCreateAggregated doesn't matter for reuse)
                 return true;
             }
-            else if (_capacity > _signals.Count)
+
+            // Don't create new top-level aggregated containers when requested.
+            if (dontCreateAggregated)
+                return false;
+
+            if (_capacity > _signals.Count)
             {
                 aggregated = client;
                 _signals.Add(aggregated.Id, aggregated);
                 return true;
             }
+
             return false;
         }
 
