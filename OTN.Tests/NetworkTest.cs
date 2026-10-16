@@ -8,61 +8,68 @@ using QuikGraph.Algorithms;
 
 namespace OTN.Tests;
 
-[TestFixture]
-public class NetworkTest
+public sealed class NetworkFixture
 {
-    private Network _network;
-    private NetNode _source = null!;
-    private NetNode _target = null!;
-    private List<Link> _bestRoute = null!;
+    public Network Network { get; }
+    public NetNode Source { get; }
+    public NetNode Target { get; private set; }
+    public List<Link> BestRoute { get; }
 
-    [OneTimeSetUp]
-    public void OneTimeSetup()
+    public NetworkFixture()
     {
-        _network = NetworkFactory.Create(35, 5, 3);
-        
+        Network = NetworkFactory.Create(35, 5, 3);
+
         var rnd = new Random();
-        var n = _network.Optical.Vertices.ToArray();
-        _source = n[rnd.Next(n.Length)];
-        _target = n[rnd.Next(n.Length)];
+        var nodes = Network.Optical.Vertices.ToArray();
+        Source = nodes[rnd.Next(nodes.Length)];
+        Target = nodes[rnd.Next(nodes.Length)];
 
-        var dijkstra = _network.Optical.ShortestPathsDijkstra(l => l.Tag, _source);
-        IEnumerable<Link> r;
-        while (_source.Equals(_target) || !dijkstra(_target, out r))
-            _target = n[rnd.Next(n.Length)];
+        var dijkstra = Network.Optical.ShortestPathsDijkstra(link => link.Tag, Source);
+        IEnumerable<Link> route;
+        while (Source.Equals(Target) || !dijkstra(Target, out route))
+            Target = nodes[rnd.Next(nodes.Length)];
 
-        _bestRoute = r.ToList();
+        BestRoute = route.ToList();
     }
+}
 
-    [Test]
+public class NetworkTest : IClassFixture<NetworkFixture>
+{
+    private readonly NetworkFixture _fixture;
+
+    public NetworkTest(NetworkFixture fixture) => _fixture = fixture;
+
+    [Fact]
     public void FindOpticPathsAsync_AssertPathFound()
     {
         // Assert that without constraints our functions returns an obviously dijkstra route
-        var kRoutes = _network.Optical.FindOpticPath(_source, _target);
-        var mustPassRoute = _network.Optical.FindMustPassOpticPath(_source, _target);
+        var kRoutes = _fixture.Network.Optical.FindOpticPath(
+            _fixture.Source, _fixture.Target, cancellationToken: TestContext.Current.CancellationToken);
+        var mustPassRoute = _fixture.Network.Optical.FindMustPassOpticPath(_fixture.Source, _fixture.Target);
 
         Assert.Multiple(() =>
         {
-            Assert.That(_bestRoute.SequenceEqual(kRoutes[0]));
-            Assert.That(_bestRoute.SequenceEqual(mustPassRoute));
+            Assert.Equal(_fixture.BestRoute, kRoutes[0]);
+            Assert.Equal(_fixture.BestRoute, mustPassRoute);
         });
     }
-    
-    [Test]
+
+    [Fact]
     public void FindOpticPathsAsync_AssertPathUnique()
     {
         // Assert that k-paths are unique
-        var routes = _network.Optical.FindOpticPath(_source, _target);
-        Assert.That(routes, Is.Not.Empty);
+        var routes = _fixture.Network.Optical.FindOpticPath(
+            _fixture.Source, _fixture.Target, cancellationToken: TestContext.Current.CancellationToken);
+        Assert.NotEmpty(routes);
 
         if (routes.Count == 1)
             return;
 
-        var bestRoute = routes[0];
         for (var i = 0; i < routes.Count - 1; i++)
         {
             var currentRoute = routes[i];
-            Assert.That(routes.Skip(i + 1).All(r => !r.SequenceEqual(_bestRoute) && !r.SequenceEqual(currentRoute) ));
+            Assert.True(routes.Skip(i + 1).All(route =>
+                !route.SequenceEqual(_fixture.BestRoute) && !route.SequenceEqual(currentRoute)));
         }
     }
 }

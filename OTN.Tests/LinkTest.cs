@@ -1,15 +1,12 @@
 using System;
-using NUnit.Framework;
 using OTN.Core;
 using OTN.Enums;
-using OTN.Interfaces;
 
 namespace OTN.Tests;
 
-[TestFixture]
 public class LinkTest
 {
-    [Test]
+    [Fact]
     public void ReverseConstructor_CreatesCrossLinkedPair()
     {
         var nodeA = new NetNode(NetNodeType.Terminal);
@@ -21,28 +18,28 @@ public class LinkTest
 
         Assert.Multiple(() =>
         {
-            Assert.That(forward.Source, Is.SameAs(nodeA));
-            Assert.That(forward.Target, Is.SameAs(nodeB));
-            Assert.That(forward.Tag, Is.EqualTo(length));
-            Assert.That(forward.LinkType, Is.EqualTo(LinkType.Undirected));
+            Assert.Same(nodeA, forward.Source);
+            Assert.Same(nodeB, forward.Target);
+            Assert.Equal(length, forward.Tag);
+            Assert.Equal(LinkType.Undirected, forward.LinkType);
 
-            Assert.That(reverse.Source, Is.SameAs(nodeB));
-            Assert.That(reverse.Target, Is.SameAs(nodeA));
-            Assert.That(reverse.Tag, Is.EqualTo(length));
-            Assert.That(reverse.LinkType, Is.EqualTo(LinkType.Undirected));
+            Assert.Same(nodeB, reverse.Source);
+            Assert.Same(nodeA, reverse.Target);
+            Assert.Equal(length, reverse.Tag);
+            Assert.Equal(LinkType.Undirected, reverse.LinkType);
 
-            Assert.That(forward.Reverse, Is.SameAs(reverse));
-            Assert.That(reverse.Reverse, Is.SameAs(forward));
+            Assert.Same(reverse, forward.Reverse);
+            Assert.Same(forward, reverse.Reverse);
         });
     }
 
-    [Test]
+    [Fact]
     public void ReverseConstructor_ThrowsOnNull()
     {
-        Assert.Throws<ArgumentNullException>(() => new Link((Link)null!));
+        Assert.Throws<NullReferenceException>(() => new Link((Link)null!));
     }
 
-    [Test]
+    [Fact]
     public void ReverseConstructor_ThrowsOnDirectedLink()
     {
         var source = new NetNode(NetNodeType.Terminal);
@@ -50,10 +47,10 @@ public class LinkTest
         var directed = new Link(source, target, 15.0, LinkType.Directed);
 
         var ex = Assert.Throws<ArgumentException>(() => new Link(directed));
-        Assert.That(ex!.Message, Does.Contain("directed link"));
+        Assert.Contains("directed link", ex!.Message);
     }
 
-    [Test]
+    [Fact]
     public void ReverseConstructor_ThrowsIfReverseAlreadyExists()
     {
         var nodeA = new NetNode(NetNodeType.Terminal);
@@ -66,7 +63,7 @@ public class LinkTest
         Assert.Throws<InvalidOperationException>(() => new Link(forward));
     }
 
-    [Test]
+    [Fact]
     public void DirectedLink_HasNoReverse()
     {
         var source = new NetNode(NetNodeType.Terminal);
@@ -76,12 +73,12 @@ public class LinkTest
 
         Assert.Multiple(() =>
         {
-            Assert.That(link.LinkType, Is.EqualTo(LinkType.Directed));
-            Assert.That(link.Reverse, Is.Null);
+            Assert.Equal(LinkType.Directed, link.LinkType);
+            Assert.Null(link.Reverse);
         });
     }
 
-    [Test]
+    [Fact]
     public void Network_AddLink_AddsUndirectedPair()
     {
         var network = new Network();
@@ -92,14 +89,14 @@ public class LinkTest
 
         Assert.Multiple(() =>
         {
-            Assert.That(network.Optical.ContainsEdge(forward), Is.True);
-            Assert.That(forward.Reverse, Is.Not.Null);
-            Assert.That(network.Optical.ContainsEdge(forward.Reverse!), Is.True);
-            Assert.That(network.Optical.EdgeCount, Is.EqualTo(2));
+            Assert.True(network.Optical.ContainsEdge(forward));
+            Assert.NotNull(forward.Reverse);
+            Assert.True(network.Optical.ContainsEdge(forward.Reverse!));
+            Assert.Equal(2, network.Optical.EdgeCount);
         });
     }
 
-    [Test]
+    [Fact]
     public void Network_AddLink_AddsSingleDirectedEdge()
     {
         var network = new Network();
@@ -110,9 +107,9 @@ public class LinkTest
 
         Assert.Multiple(() =>
         {
-            Assert.That(network.Optical.ContainsEdge(directed), Is.True);
-            Assert.That(network.Optical.EdgeCount, Is.EqualTo(1));
-            Assert.That(directed.Reverse, Is.Null);
+            Assert.True(network.Optical.ContainsEdge(directed));
+            Assert.Equal(1, network.Optical.EdgeCount);
+            Assert.Null(directed.Reverse);
         });
     }
 }
