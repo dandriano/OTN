@@ -21,6 +21,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\OTN\OTN.csproj" />
+    <ProjectReference Include="..\OTN.Editor\OTN.Editor.csproj" />
   </ItemGroup>
 
 </Project>
