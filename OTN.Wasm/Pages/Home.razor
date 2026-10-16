@@ -1,0 +1,311 @@
+@page "/"
+@implements IDisposable
+@inject EditorDocument Document
+@inject IJSRuntime JS
+
+<PageTitle>OTN Demo</PageTitle>
+<main class="editor-shell">
+    <header class="topbar">
+        <div class="brand"><span class="brand-mark">O</span><div><strong>OTN</strong><small>Optical transport network demo</small></div></div>
+        <div class="graph-counts"><span><b>@Document.Nodes.Count</b> nodes</span><i></i><span><b>@Document.Links.Count</b> links</span></div>
+        <div class="top-actions"><button class="icon-button" @onclick="ZoomOut">−</button><span>@((int)(_zoom * 100))%</span><button class="icon-button" @onclick="ZoomIn">+</button><button class="icon-button" @onclick="ResetView">⌂</button></div>
+    </header>
+    <div class="workspace">
+        <section class="canvas-area">
+            <div class="toolbar">
+                <div class="tool-group">
+                    <button class="tool-button @ActiveMode(EditorMode.Select)" @onclick="() => SetMode(EditorMode.Select)">↖ Select</button>
+                    <button class="tool-button @ActiveMode(EditorMode.Edit)" @onclick="() => SetMode(EditorMode.Edit)">✎ Edit</button>
+                </div>
+                @if (_mode == EditorMode.Edit)
+                {
+                    <div class="tool-group creation-tools" aria-label="Edit tool">
+                        <button class="tool-button @ActiveCreation(CreationMode.Node)" @onclick="() => SetCreationMode(CreationMode.Node)">＋ Node</button>
+                        <button class="tool-button @ActiveCreation(CreationMode.Link)" @onclick="() => SetCreationMode(CreationMode.Link)">⌁ Link</button>
+                    </div>
+                    @if (_creationMode == CreationMode.Node)
+                    {
+                        <label>Type <select @bind="_newNodeType"><option>Terminal</option><option>OLA</option><option>ROADM</option></select></label>
+                        <span class="mode-hint">Click the canvas to place nodes</span>
+                    }
+                    else
+                    {
+                        <label class="toolbar-select">Direction <select @bind="_newLinkType"><option value="Undirected">Two way</option><option value="Directed">One way</option></select></label>
+                        <span class="mode-hint">@(Document.PendingLinkSource is null ? "Select a source node" : "Select a target node · Escape to cancel")</span>
+                    }
+                }
+            </div>
+            <div class="canvas-surface" @onpointerdown="CanvasPointerDown" @onpointermove="CanvasPointerMove" @onpointerup="CanvasPointerUp" @onpointerleave="CanvasPointerUp" @onwheel="Wheel" @onwheel:preventDefault="true" @onkeydown="CanvasKeyDown" tabindex="0">
+                <Canvas Width="1000" Height="680" OnCanvasReady="CanvasReady" OnFrameReady="DrawFrame" />
+            </div>
+            <footer class="canvas-footer"><span><kbd>Ctrl</kbd> + click tags a node</span><span>Scroll to zoom · drag canvas to pan</span><span class="status-dot">● Ready</span></footer>
+        </section>
+        <aside class="side-panel">
+            <section class="panel-section">
+                <div class="section-heading"><div><span class="eyebrow">PROPERTIES</span><h2>Inspector</h2></div></div>
+                @if (Document.SelectedNode is { } selectedNode)
+                {
+                    <div class="selected-kind"><span class="kind-icon @NodeClass(selectedNode.Node.Type)">●</span><div><strong>Network node</strong><small>@selectedNode.Node.Id</small></div></div>
+                    <label class="field-label">Node type</label><select class="field" value="@selectedNode.Node.Type" @onchange="e => ChangeNodeType(selectedNode, e.Value?.ToString())"><option>Terminal</option><option>OLA</option><option>ROADM</option></select>
+                    <label class="field-label">Routing role</label><select class="field" value="@selectedNode.Node.RoutingRole" @onchange="e => ChangeNodeRole(selectedNode, e.Value?.ToString())"><option value="Undefined">Undefined</option><option value="InRoute">In route</option><option value="OutRoute">Out route</option></select>
+                    <div class="readonly-row"><span>Canvas position</span><strong>@selectedNode.X.ToString("0"), @selectedNode.Y.ToString("0")</strong></div>
+                }
+                else if (Document.SelectedLink is { } selectedLink)
+                {
+                    <div class="selected-kind"><span class="kind-icon link-kind">↔</span><div><strong>Optical link</strong><small>@selectedLink.Link.Id</small></div></div>
+                    <label class="field-label">Length (km)</label><input class="field" type="number" min="0" step="0.1" @bind="_linkWeight" />
+                    <label class="field-label">Direction</label><select class="field" @bind="_linkDirection"><option value="Directed">One way</option><option value="Undirected">Two way</option></select>
+                    <button class="primary-button full-width" @onclick="() => UpdateSelectedLink(selectedLink)">Apply changes</button>
+                }
+                else { <div class="inspector-empty"><span>⌖</span><p>Select a node or link to inspect its properties.</p></div> }
+            </section>
+            <section class="panel-section routing-section">
+                <div class="section-heading"><div><span class="eyebrow">PATH ANALYSIS</span><h2>Route finder</h2></div><span class="route-icon">⌁</span></div>
+                <label class="field-label">Source</label><select class="field" @bind="_sourceId"><option value="">Select source</option>@foreach (var item in Document.Nodes) { <option value="@item.Node.Id">@NodeOption(item)</option> }</select>
+                <label class="field-label">Target</label><select class="field" @bind="_targetId"><option value="">Select target</option>@foreach (var item in Document.Nodes) { <option value="@item.Node.Id">@NodeOption(item)</option> }</select>
+                <div class="route-controls"><label><span>K shortest</span><input type="number" min="1" max="20" @bind="_routeCount" /></label><button class="primary-button" disabled="@Document.IsRouting" @onclick="RunKRoutes">Find routes</button></div>
+                <button class="secondary-button full-width" disabled="@Document.IsRouting" @onclick="RunMustPass">Find must-pass route <span>→</span></button>
+                @if (Document.IsRouting) { <div class="route-status"><span class="spinner"></span>Searching routes…</div> }
+                @if (Document.RouteError is { } error) { <div class="error-message"><strong>Route search failed</strong><span>@error</span></div> }
+                @if (Document.Routes.Count > 0)
+                {
+                    <div class="results-heading"><span>RESULTS</span><span>@Document.Routes.Count found</span></div>
+                    @for (var i = 0; i < Document.Routes.Count; i++)
+                    {
+                        var index = i; var route = Document.Routes[i];
+                        <button class="route-result @(Document.SelectedRouteIndex == i ? "active" : "")" @onclick="() => Document.SelectRouteCommand.Execute(index)">
+                            <span class="route-number">@(i + 1)</span><span class="route-path"><strong>@route.Description</strong><small>@route.Links.Count links</small></span><strong class="route-length">@route.Length.ToString("0.##")<small>km</small></strong>
+                        </button>
+                    }
+                }
+            </section>
+        </aside>
+    </div>
+</main>
+
+@code {
+    private enum EditorMode { Select, Edit }
+    private enum CreationMode { Node, Link }
+    private CanvasBase? _canvas;
+    private EditorMode _mode = EditorMode.Select;
+    private CreationMode _creationMode = CreationMode.Node;
+    private NetNodeType _newNodeType = NetNodeType.Terminal;
+    private LinkType _newLinkType = LinkType.Undirected, _linkDirection = LinkType.Undirected;
+    private string _linkWeight = "100", _sourceId = "", _targetId = "";
+    private int _routeCount = 3;
+    private double _zoom = 1, _panX, _panY, _pointerX, _pointerY, _dragStartX, _dragStartY, _panStartX, _panStartY, _panOriginX, _panOriginY;
+    private EditorNode? _dragNode;
+    private bool _panning;
+    private HashSet<Link> _highlightedLinks = [];
+    protected override void OnInitialized() => Document.PropertyChanged += DocumentChanged;
+    private void DocumentChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(EditorDocument.Revision) or nameof(EditorDocument.Routes) or nameof(EditorDocument.SelectedRouteIndex))
+            _highlightedLinks = Document.SelectedRouteIndex >= 0 ? Document.Routes[Document.SelectedRouteIndex].Links.ToHashSet() : [];
+        _ = InvokeAsync(StateHasChanged);
+    }
+    public void Dispose() => Document.PropertyChanged -= DocumentChanged;
+    private EditorNode NodeFor(NetNode n) => Document.Nodes.First(item => ReferenceEquals(item.Node, n));
+    private string ActiveMode(EditorMode mode) => _mode == mode ? "active" : "";
+    private string ActiveCreation(CreationMode mode) => _creationMode == mode ? "active" : "";
+    private static string NodeClass(NetNodeType type) => type.ToString().ToLowerInvariant();
+    private static string NodeOption(EditorNode item) => string.Concat(item.Node.Type, " · ", item.Node.Id.ToString()[..5]);
+    private bool IsHighlighted(Link link) => _highlightedLinks.Contains(link);
+    private void SetMode(EditorMode mode)
+    {
+        _mode = mode;
+        if (mode != EditorMode.Edit || _creationMode != CreationMode.Link)
+            Document.CancelPendingLinkCommand.Execute(null);
+    }
+    private void SetCreationMode(CreationMode mode)
+    {
+        _creationMode = mode;
+        if (mode != CreationMode.Link) Document.CancelPendingLinkCommand.Execute(null);
+    }
+    private void SelectLink(EditorLink link)
+    {
+        Document.SelectLink(link); _linkWeight = link.Link.Tag.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+        _linkDirection = link.Link.LinkType; _mode = EditorMode.Select;
+    }
+    private void CanvasReady(CanvasBase canvas) => _canvas = canvas;
+    private void DrawFrame(float timestamp)
+    {
+        if (_canvas is null) return;
+        var context = _canvas.RenderContext;
+        context.ClearRect(0, 0, 1000, 680);
+        context.FillStyle = "#f8fafc";
+        context.FillRect(0, 0, 1000, 680);
+        context.FillStyle = "#d9e1ea";
+        for (var x = 12; x < 1000; x += 24)
+            for (var y = 12; y < 680; y += 24)
+            {
+                context.BeginPath(); context.Arc(x, y, 1, 0, MathF.PI * 2, false); context.Fill();
+            }
+        context.Save();
+        context.Translate((float)_panX, (float)_panY);
+        context.Scale((float)_zoom, (float)_zoom);
+        foreach (var item in Document.Links) DrawLink(context, item.Link);
+        if (Document.PendingLinkSource is { } pending)
+        {
+            context.StrokeStyle = "#3182e6"; context.LineWidth = 2;
+            context.BeginPath(); context.MoveTo((float)pending.X, (float)pending.Y); context.LineTo((float)_pointerX, (float)_pointerY); context.Stroke();
+        }
+        foreach (var item in Document.Nodes) DrawNode(context, item);
+        if (Document.Nodes.Count == 0)
+        {
+            context.TextAlign = TextAlign.Center;
+            context.FillStyle = "#52667d"; context.Font = "700 18px sans-serif"; context.FillText("Your graph starts here", 500, 320);
+            context.FillStyle = "#92a0ae"; context.Font = "12px sans-serif"; context.FillText("Choose Edit → Node, then click anywhere on the canvas", 500, 348);
+        }
+        context.Restore();
+    }
+    private void DrawLink(IRenderContext context, Link link)
+    {
+        var source = NodeFor(link.Source); var target = NodeFor(link.Target);
+        context.StrokeStyle = IsHighlighted(link) ? "#2679e8" : "#9aa9b8";
+        context.LineWidth = IsHighlighted(link) ? 4 : 2;
+        context.BeginPath(); context.MoveTo((float)source.X, (float)source.Y); context.LineTo((float)target.X, (float)target.Y); context.Stroke();
+        DrawArrow(context, source.X, source.Y, target.X, target.Y);
+        if (link.LinkType == LinkType.Undirected) DrawArrow(context, target.X, target.Y, source.X, source.Y);
+        context.FillStyle = "#617184"; context.Font = "11px sans-serif"; context.TextAlign = TextAlign.Center;
+        context.FillText(string.Concat(link.Tag.ToString("0.##"), " km"), (float)((source.X + target.X) / 2), (float)((source.Y + target.Y) / 2 - 8));
+    }
+    private static void DrawArrow(IRenderContext context, double fromX, double fromY, double toX, double toY)
+    {
+        var angle = Math.Atan2(toY - fromY, toX - fromX);
+        const double length = 9, spread = .55;
+        context.StrokeStyle = "#7b8ba0"; context.LineWidth = 2; context.BeginPath();
+        context.MoveTo((float)toX, (float)toY); context.LineTo((float)(toX - length * Math.Cos(angle - spread)), (float)(toY - length * Math.Sin(angle - spread)));
+        context.MoveTo((float)toX, (float)toY); context.LineTo((float)(toX - length * Math.Cos(angle + spread)), (float)(toY - length * Math.Sin(angle + spread)));
+        context.Stroke();
+    }
+    private void DrawNode(IRenderContext context, EditorNode item)
+    {
+        var node = item.Node;
+        var stroke = node.Type switch { NetNodeType.Terminal => "#55a49a", NetNodeType.OLA => "#df9a4b", _ => "#7189d2" };
+        if (Document.SelectedNode == item) stroke = "#2679e8";
+        context.FillStyle = "#ffffff"; context.StrokeStyle = stroke; context.LineWidth = Document.SelectedNode == item ? 3 : 2;
+        context.BeginPath();
+        if (node.Type == NetNodeType.Terminal) context.Arc((float)item.X, (float)item.Y, 24, 0, MathF.PI * 2, false);
+        else if (node.Type == NetNodeType.OLA)
+        {
+            context.MoveTo((float)item.X, (float)(item.Y - 26)); context.LineTo((float)(item.X + 25), (float)item.Y);
+            context.LineTo((float)item.X, (float)(item.Y + 26)); context.LineTo((float)(item.X - 25), (float)item.Y); context.ClosePath();
+        }
+        else context.Rect((float)(item.X - 26), (float)(item.Y - 22), 52, 44);
+        context.Fill(); context.Stroke();
+        if (item.CtrlTagged)
+        {
+            context.StrokeStyle = "#df8b4a"; context.LineWidth = 2; context.BeginPath();
+            context.Arc((float)item.X, (float)item.Y, 29, 0, MathF.PI * 2, false); context.Stroke();
+        }
+        context.FillStyle = "#314156"; context.Font = "700 10px sans-serif"; context.TextAlign = TextAlign.Center;
+        context.FillText(node.Id.ToString()[..5], (float)item.X, (float)item.Y + 4);
+        if (node.RoutingRole != RouteNodeType.Undefined)
+        {
+            context.FillStyle = "#4b76b7"; context.Font = "700 8px sans-serif";
+            context.FillText(node.RoutingRole == RouteNodeType.InRoute ? "IN ROUTE" : "OUT ROUTE", (float)item.X, (float)item.Y + 42);
+        }
+    }
+    private async Task<double[]> Point(PointerEventArgs e)
+    {
+        if (_canvas is null) return [e.OffsetX, e.OffsetY];
+        try { return await JS.InvokeAsync<double[]>("otnEditor.point", _canvas.ElementReference, e.ClientX, e.ClientY); }
+        catch { return [e.OffsetX, e.OffsetY]; }
+    }
+    private async Task StartNodePointer(EditorNode node, PointerEventArgs e)
+    {
+        if (_mode != EditorMode.Select || Document.PendingLinkSource is not null) return;
+        var p = await Point(e); _dragNode = node;
+        _dragStartX = (p[0] - _panX) / _zoom - node.X; _dragStartY = (p[1] - _panY) / _zoom - node.Y;
+    }
+    private async Task CanvasPointerDown(PointerEventArgs e)
+    {
+        var p = await Point(e); _pointerX = (p[0] - _panX) / _zoom; _pointerY = (p[1] - _panY) / _zoom;
+        if (e.Button != 0)
+        {
+            _panning = true; _panStartX = p[0]; _panStartY = p[1]; _panOriginX = _panX; _panOriginY = _panY;
+            return;
+        }
+        if (_mode == EditorMode.Edit && _creationMode == CreationMode.Node)
+        {
+            Document.AddNode(_newNodeType, _pointerX, _pointerY);
+            return;
+        }
+        var hitNode = Document.Nodes.LastOrDefault(item => Math.Sqrt(Math.Pow(item.X - _pointerX, 2) + Math.Pow(item.Y - _pointerY, 2)) <= 29);
+        if (hitNode is not null)
+        {
+            if (_mode == EditorMode.Edit && _creationMode == CreationMode.Link)
+            {
+                if (Document.PendingLinkSource is null) Document.BeginLink(hitNode);
+                else if (Document.CompleteLink(hitNode, 100, _newLinkType))
+                {
+                    if (Document.SelectedLink is { } link) UpdateLinkInspector(link);
+                }
+                return;
+            }
+            if (e.CtrlKey) { Document.SetCtrlTag(hitNode, !hitNode.CtrlTagged); return; }
+            if (_mode == EditorMode.Select)
+            {
+                Document.SelectNode(hitNode); _dragNode = hitNode;
+                _dragStartX = _pointerX - hitNode.X; _dragStartY = _pointerY - hitNode.Y;
+            }
+        }
+        else if (_mode == EditorMode.Edit && _creationMode == CreationMode.Link) Document.CancelPendingLink();
+        else if (_mode == EditorMode.Select)
+        {
+            var hitLink = Document.Links.LastOrDefault(item => DistanceToLink(_pointerX, _pointerY, item.Link) < 9);
+            if (hitLink is not null) SelectLink(hitLink); else Document.SelectNode(null);
+            _panning = true; _panStartX = p[0]; _panStartY = p[1]; _panOriginX = _panX; _panOriginY = _panY;
+        }
+    }
+    private async Task CanvasPointerMove(PointerEventArgs e)
+    {
+        var p = await Point(e); _pointerX = (p[0] - _panX) / _zoom; _pointerY = (p[1] - _panY) / _zoom;
+        if (_dragNode is { } node) Document.MoveNode(node, _pointerX - _dragStartX, _pointerY - _dragStartY);
+        if (_panning) { _panX = _panOriginX + p[0] - _panStartX; _panY = _panOriginY + p[1] - _panStartY; }
+    }
+    private void CanvasPointerUp(PointerEventArgs e) { _dragNode = null; _panning = false; }
+    private double DistanceToLink(double x, double y, Link link)
+    {
+        var source = NodeFor(link.Source); var target = NodeFor(link.Target);
+        var dx = target.X - source.X; var dy = target.Y - source.Y;
+        var lengthSquared = dx * dx + dy * dy;
+        if (lengthSquared == 0) return double.MaxValue;
+        var t = Math.Clamp(((x - source.X) * dx + (y - source.Y) * dy) / lengthSquared, 0, 1);
+        return Math.Sqrt(Math.Pow(x - (source.X + t * dx), 2) + Math.Pow(y - (source.Y + t * dy), 2));
+    }
+    private void CanvasKeyDown(KeyboardEventArgs e) { if (e.Key == "Escape") Document.CancelPendingLinkCommand.Execute(null); }
+    private void Wheel(WheelEventArgs e) => _zoom = Math.Clamp(_zoom * (e.DeltaY < 0 ? 1.1 : 0.9), 0.35, 2.8);
+    private void ZoomIn() => _zoom = Math.Min(2.8, _zoom * 1.15);
+    private void ZoomOut() => _zoom = Math.Max(0.35, _zoom / 1.15);
+    private void ResetView() { _zoom = 1; _panX = 0; _panY = 0; }
+    private void ChangeNodeType(EditorNode node, string? value) { if (Enum.TryParse<NetNodeType>(value, out var type)) Document.SetNodeType(node, type); }
+    private void ChangeNodeRole(EditorNode node, string? value) { if (Enum.TryParse<RouteNodeType>(value, out var role)) Document.SetRoutingRole(node, role); }
+    private void UpdateSelectedLink(EditorLink link)
+    {
+        if (double.TryParse(_linkWeight, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var weight))
+            Document.UpdateLink(link, weight, _linkDirection);
+    }
+    private void UpdateLinkInspector(EditorLink link)
+    {
+        _linkWeight = link.Link.Tag.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+        _linkDirection = link.Link.LinkType;
+    }
+    private async Task RunKRoutes()
+    {
+        if (!Guid.TryParse(_sourceId, out var source) || !Guid.TryParse(_targetId, out var target)) return;
+        Document.PrepareRouteSearch();
+        StateHasChanged();
+        await Task.Delay(30);
+        Document.FindKRoutes(source, target, Math.Clamp(_routeCount, 1, 20));
+    }
+    private async Task RunMustPass()
+    {
+        if (!Guid.TryParse(_sourceId, out var source) || !Guid.TryParse(_targetId, out var target)) return;
+        Document.PrepareRouteSearch();
+        StateHasChanged();
+        await Task.Delay(30);
+        Document.FindMustPassRoute(source, target);
+    }
+}
