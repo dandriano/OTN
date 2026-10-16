@@ -54,6 +54,33 @@ public class Network
         return l;
     }
 
+    /// <summary>Changes a node's equipment type.</summary>
+    public void SetNodeType(NetNode node, NetNodeType type)
+    {
+        ArgumentNullException.ThrowIfNull(node);
+        if (!Optical.ContainsVertex(node))
+            throw new ArgumentException("The node is not part of this network.", nameof(node));
+
+        node.SetType(type);
+    }
+
+    /// <summary>Replaces a link and its reverse edge, if present, with updated link data.</summary>
+    public Link UpdateLink(Link link, double length, LinkType linkType)
+    {
+        ArgumentNullException.ThrowIfNull(link);
+        if (!Optical.ContainsEdge(link))
+            throw new ArgumentException("The link is not part of this network.", nameof(link));
+
+        var source = link.Source;
+        var target = link.Target;
+        var oldReverse = link.Reverse;
+        Optical.RemoveEdge(link);
+        if (oldReverse is not null && Optical.ContainsEdge(oldReverse))
+            Optical.RemoveEdge(oldReverse);
+
+        return (Link)AddLink(source, target, length, linkType);
+    }
+
     public IOtnNode AddOtnNode(NetNode node, IEnumerable<AggregationRule> rules, int capacity = 1)
     {
         return AddOtnNode(node, rules, OtnSettings.Default, capacity);

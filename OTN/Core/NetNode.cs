@@ -28,6 +28,11 @@ public class NetNode : INetNode
         RoutingRole = role;
     }
 
+    public void SetType(NetNodeType type)
+    {
+        Type = type;
+    }
+
     public override string ToString()
     {
         return Id.ToString()[..5];
