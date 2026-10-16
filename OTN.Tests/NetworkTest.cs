@@ -40,6 +40,37 @@ public class NetworkTest : IClassFixture<NetworkFixture>
     public NetworkTest(NetworkFixture fixture) => _fixture = fixture;
 
     [Fact]
+    public void Create_WithSameSeed_ProducesSameTopologyAndWeights()
+    {
+        var first = NetworkFactory.Create(35, 5, 3, mustPassNodes: 4, mustAvoidNodes: 5, seed: 421);
+        var second = NetworkFactory.Create(35, 5, 3, mustPassNodes: 4, mustAvoidNodes: 5, seed: 421);
+
+        var firstNodes = first.Optical.Vertices.ToArray();
+        var secondNodes = second.Optical.Vertices.ToArray();
+        var firstNodeIndices = firstNodes.Select((node, index) => (node, index)).ToDictionary(pair => pair.node, pair => pair.index);
+        var secondNodeIndices = secondNodes.Select((node, index) => (node, index)).ToDictionary(pair => pair.node, pair => pair.index);
+
+        Assert.Equal(
+            firstNodes.Select(node => (node.Type, node.RoutingRole)),
+            secondNodes.Select(node => (node.Type, node.RoutingRole)));
+
+        var firstEdges = first.Optical.Edges
+            .Select(edge => (Source: firstNodeIndices[edge.Source], Target: firstNodeIndices[edge.Target], Weight: edge.Tag))
+            .OrderBy(edge => edge.Source)
+            .ThenBy(edge => edge.Target)
+            .ThenBy(edge => edge.Weight)
+            .ToArray();
+        var secondEdges = second.Optical.Edges
+            .Select(edge => (Source: secondNodeIndices[edge.Source], Target: secondNodeIndices[edge.Target], Weight: edge.Tag))
+            .OrderBy(edge => edge.Source)
+            .ThenBy(edge => edge.Target)
+            .ThenBy(edge => edge.Weight)
+            .ToArray();
+
+        Assert.Equal(firstEdges, secondEdges);
+    }
+
+    [Fact]
     public void FindOpticPathsAsync_AssertPathFound()
     {
         // Assert that without constraints our functions returns an obviously dijkstra route

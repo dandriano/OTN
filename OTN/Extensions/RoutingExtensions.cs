@@ -49,7 +49,7 @@ public static class RoutingExtensions
         this IVertexAndEdgeListGraph<NetNode, Link> graph,
         NetNode source,
         NetNode target,
-        int k = 5,
+        int k = 1,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(graph);

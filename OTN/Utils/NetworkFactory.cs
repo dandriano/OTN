@@ -9,16 +9,36 @@ namespace OTN.Utils;
 
 public static class NetworkFactory
 {
-    public static Network Create(int totalNodes, int backboneNodes, int avgEdgesPerNode, int mustPassNodes = 0, int mustAvoidNodes = 0)
+    public static Network Create(int totalNodes, int backboneNodes, int connectionAttemptUpperBound, int mustPassNodes = 0, int mustAvoidNodes = 0)
     {
-        var network = new Network(CreateMagistralNetworkGraph(totalNodes, backboneNodes, avgEdgesPerNode, mustPassNodes, mustAvoidNodes));
+        return Create(totalNodes, backboneNodes, connectionAttemptUpperBound, mustPassNodes, mustAvoidNodes, new Random());
+    }
+
+    public static Network Create(int totalNodes, int backboneNodes, int connectionAttemptUpperBound, int mustPassNodes, int mustAvoidNodes, int seed)
+    {
+        return Create(totalNodes, backboneNodes, connectionAttemptUpperBound, mustPassNodes, mustAvoidNodes, new Random(seed));
+    }
+
+    private static Network Create(int totalNodes, int backboneNodes, int connectionAttemptUpperBound, int mustPassNodes, int mustAvoidNodes, Random random)
+    {
+        var network = new Network(CreateMagistralNetworkGraph(totalNodes, backboneNodes, connectionAttemptUpperBound, mustPassNodes, mustAvoidNodes, random));
 
         return network;
     }
 
-    public static BidirectionalGraph<NetNode, Link> CreateMagistralNetworkGraph(int totalNodes, int backboneNodes, int avgEdgesPerNode, int mustPassNodes = 0, int mustAvoidNodes = 0)
+    public static BidirectionalGraph<NetNode, Link> CreateMagistralNetworkGraph(int totalNodes, int backboneNodes, int connectionAttemptUpperBound, int mustPassNodes = 0, int mustAvoidNodes = 0)
     {
-        if (totalNodes < 0 || backboneNodes < 0 || mustPassNodes < 0 || mustAvoidNodes < 0 || avgEdgesPerNode < 0)
+        return CreateMagistralNetworkGraph(totalNodes, backboneNodes, connectionAttemptUpperBound, mustPassNodes, mustAvoidNodes, new Random());
+    }
+
+    public static BidirectionalGraph<NetNode, Link> CreateMagistralNetworkGraph(int totalNodes, int backboneNodes, int connectionAttemptUpperBound, int mustPassNodes, int mustAvoidNodes, int seed)
+    {
+        return CreateMagistralNetworkGraph(totalNodes, backboneNodes, connectionAttemptUpperBound, mustPassNodes, mustAvoidNodes, new Random(seed));
+    }
+
+    private static BidirectionalGraph<NetNode, Link> CreateMagistralNetworkGraph(int totalNodes, int backboneNodes, int connectionAttemptUpperBound, int mustPassNodes, int mustAvoidNodes, Random rand)
+    {
+        if (totalNodes < 0 || backboneNodes < 0 || mustPassNodes < 0 || mustAvoidNodes < 0 || connectionAttemptUpperBound < 0)
             throw new ArgumentException("Input parameters cannot be negative.");
         if (mustPassNodes + mustAvoidNodes > totalNodes)
             throw new ArgumentException("Too many must-pass or must-avoid nodes.");
@@ -48,7 +68,6 @@ public static class NetworkFactory
             }
         }
 
-        var rand = new Random();
         // Connect backbone nodes densely (full mesh or near-full)
         for (var i = 0; i < backboneNodes; i++)
         {
@@ -64,7 +83,7 @@ public static class NetworkFactory
         // Connect other nodes sparsely to random backbone or close neighbors
         for (var i = backboneNodes; i < totalNodes; i++)
         {
-            var connections = Math.Max(1, rand.Next(avgEdgesPerNode)); // at least 1 connection
+            var connections = Math.Max(1, rand.Next(connectionAttemptUpperBound)); // exclusive upper bound; at least one attempt
 
             for (var c = 0; c < connections; c++)
             {
