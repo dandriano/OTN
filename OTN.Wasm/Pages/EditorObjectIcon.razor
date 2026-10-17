@@ -1,0 +1,31 @@
+@if (NodeType is { } nodeType)
+{
+    <svg class="object-icon" viewBox="0 0 34 34" aria-hidden="true" focusable="false">
+        <path class="node-badge" d="M3.5 .5h27l3 3v27l-3 3h-27l-3-3v-27z" />
+        @if (nodeType == NetNodeType.OLA)
+        {
+            <path class="node-art" d="m11.4 8.6 12.5 7.3.8.9-.9 1.2-12.4 7.2-1.9-1.1V9.7z" />
+        }
+        else
+        {
+            <path class="node-art" d="M8.3 4.8 4.3 8.8 4 9.55v14.9l.3.71 4 4L10 28.45V5.55zM25.7 4.8l4 4 .3.75v14.9l-.3.71-4 4-1.7-.71V5.55z" />
+            @((MarkupString)"<text x=\"17\" y=\"23\" text-anchor=\"middle\" class=\"terminal-lambda\">λ</text>")
+        }
+    </svg>
+}
+else if (LinkDirection is { } linkType)
+{
+    @if (linkType == LinkType.Directed)
+    {
+        <svg class="object-icon link-object-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 12h17m-6-6 6 6-6 6" /></svg>
+    }
+    else
+    {
+        <svg class="object-icon link-object-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 12h18m-7-7 7 7-7 7M10 5l-7 7 7 7" /></svg>
+    }
+}
+
+@code {
+    [Parameter] public NetNodeType? NodeType { get; set; }
+    [Parameter] public LinkType? LinkDirection { get; set; }
+}

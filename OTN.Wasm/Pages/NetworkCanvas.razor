@@ -1,0 +1,36 @@
+<section class="canvas-area">
+    <div class="toolbar">
+        <div class="tool-group">
+            <button class="tool-button @ActiveMode(EditorMode.Select)" @onclick="() => SetMode(EditorMode.Select)">↖ Select</button>
+            <button class="tool-button @ActiveMode(EditorMode.Edit)" @onclick="() => SetMode(EditorMode.Edit)">✎ Edit</button>
+        </div>
+        @if (_mode == EditorMode.Edit)
+        {
+            <div class="tool-group creation-tools" aria-label="Edit tool">
+                <button class="tool-button @ActiveCreation(CreationMode.Node)" @onclick="() => SetCreationMode(CreationMode.Node)">＋ Node</button>
+                <button class="tool-button @ActiveCreation(CreationMode.Link)" @onclick="() => SetCreationMode(CreationMode.Link)">＋ Link</button>
+            </div>
+            @if (_creationMode == CreationMode.Node)
+            {
+                <div class="tool-group choice-group" role="group" aria-label="Node type">
+                    <button type="button" class="tool-button choice-button @ActiveNodeType(NetNodeType.Terminal)" aria-label="Terminal" aria-pressed="@(_newNodeType == NetNodeType.Terminal)" title="Terminal" @onclick="() => SetNewNodeType(NetNodeType.Terminal)"><EditorObjectIcon NodeType="NetNodeType.Terminal" /><span class="choice-label">Terminal</span></button>
+                    <button type="button" class="tool-button choice-button @ActiveNodeType(NetNodeType.OLA)" aria-label="OLA" aria-pressed="@(_newNodeType == NetNodeType.OLA)" title="OLA" @onclick="() => SetNewNodeType(NetNodeType.OLA)"><EditorObjectIcon NodeType="NetNodeType.OLA" /><span class="choice-label">OLA</span></button>
+                    <button type="button" class="tool-button choice-button @ActiveNodeType(NetNodeType.ROADM)" aria-label="ROADM" aria-pressed="@(_newNodeType == NetNodeType.ROADM)" title="ROADM" @onclick="() => SetNewNodeType(NetNodeType.ROADM)"><EditorObjectIcon NodeType="NetNodeType.ROADM" /><span class="choice-label">ROADM</span></button>
+                </div>
+                <span class="mode-hint">Click the canvas to place nodes</span>
+            }
+            else
+            {
+                <div class="tool-group choice-group" role="group" aria-label="Link direction">
+                    <button type="button" class="tool-button choice-button @ActiveLinkType(LinkType.Undirected)" aria-label="Undirected" aria-pressed="@(_newLinkType == LinkType.Undirected)" title="Undirected" @onclick="() => SetNewLinkType(LinkType.Undirected)"><EditorObjectIcon LinkDirection="LinkType.Undirected" /><span class="choice-label">Undirected</span></button>
+                    <button type="button" class="tool-button choice-button @ActiveLinkType(LinkType.Directed)" aria-label="Directed" aria-pressed="@(_newLinkType == LinkType.Directed)" title="Directed" @onclick="() => SetNewLinkType(LinkType.Directed)"><EditorObjectIcon LinkDirection="LinkType.Directed" /><span class="choice-label">Directed</span></button>
+                </div>
+                <span class="mode-hint">@(Document.PendingLinkSource is null ? "Select a source node" : "Select a target node · Escape to cancel")</span>
+            }
+        }
+    </div>
+    <div class="canvas-surface" @onpointerdown="CanvasPointerDown" @onpointermove="CanvasPointerMove" @onpointerup="CanvasPointerUp" @onpointerleave="CanvasPointerLeave" @onwheel="Wheel" @onwheel:preventDefault="true" @onkeydown="CanvasKeyDown" tabindex="0">
+        <Canvas Width="1000" Height="680" OnCanvasReady="CanvasReady" OnFrameReady="DrawFrame" />
+    </div>
+    <footer class="canvas-footer"><span><kbd>Ctrl</kbd> + click tags a node</span><span>Scroll to zoom · drag canvas to pan</span><span class="status-dot">● Ready</span></footer>
+</section>

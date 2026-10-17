@@ -122,7 +122,7 @@ public sealed class EditorDocument : ObservableObject
     public void SetNodeType(EditorNode node, NetNodeType type)
     {
         EnsureNode(node);
-        Network.SetNodeType(node.Node, type);
+        node.Node.SetType(type);
         GraphChanged();
     }
 
@@ -139,7 +139,13 @@ public sealed class EditorDocument : ObservableObject
         if (!double.IsFinite(weight) || weight < 0)
             throw new ArgumentOutOfRangeException(nameof(weight), "Link weight must be a finite non-negative value.");
 
-        editorLink.Link = Network.UpdateLink(editorLink.Link, weight, type);
+        var oldLink = editorLink.Link;
+        var oldReverse = oldLink.Reverse;
+        Network.Optical.RemoveEdge(oldLink);
+        if (oldReverse is not null && Network.Optical.ContainsEdge(oldReverse))
+            Network.Optical.RemoveEdge(oldReverse);
+
+        editorLink.Link = (Link)Network.AddLink(oldLink.Source, oldLink.Target, weight, type);
         GraphChanged();
         OnPropertyChanged(nameof(Links));
     }

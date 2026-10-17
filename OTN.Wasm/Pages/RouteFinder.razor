@@ -1,0 +1,57 @@
+<section class="panel-section routing-section">
+    <div class="section-heading">
+        <div>
+            <span class="eyebrow">PATH ANALYSIS</span>
+            <h2><button type="button" class="section-toggle" aria-expanded="@(!_collapsed)" aria-controls="route-finder-content" @onclick="ToggleCollapsed">Route finder<span class="section-chevron" aria-hidden="true">⌄</span></button></h2>
+        </div>
+    </div>
+    <div id="route-finder-content" hidden="@_collapsed">
+        <label class="field-label">Source</label><select class="field" @bind="_sourceId"><option value="">Select source</option>@foreach (var item in Document.Nodes) { <option value="@item.Node.Id">@NodeOption(item)</option> }</select>
+        <label class="field-label">Target</label><select class="field" @bind="_targetId"><option value="">Select target</option>@foreach (var item in Document.Nodes) { <option value="@item.Node.Id">@NodeOption(item)</option> }</select>
+        <div class="route-controls"><label><span>K shortest</span><input type="number" min="1" max="20" @bind="_routeCount" /></label><button class="primary-button" disabled="@Document.IsRouting" @onclick="RunKRoutes">Find routes</button></div>
+        <button class="secondary-button full-width" disabled="@Document.IsRouting" @onclick="RunMustPass">Find must-pass route <span>→</span></button>
+        @if (Document.IsRouting) { <div class="route-status"><span class="spinner"></span>Searching routes…</div> }
+        @if (Document.RouteError is { } error) { <div class="error-message"><strong>Route search failed</strong><span>@error</span></div> }
+        @if (Document.Routes.Count > 0)
+        {
+            <div class="results-heading"><span>RESULTS</span><span>@Document.Routes.Count found</span></div>
+            @for (var i = 0; i < Document.Routes.Count; i++)
+            {
+                var index = i; var route = Document.Routes[i];
+                <button class="route-result @(Document.SelectedRouteIndex == i ? "active" : "")" @onclick="() => Document.SelectRouteCommand.Execute(index)">
+                    <span class="route-number">@(i + 1)</span><span class="route-path"><strong>@route.Description</strong><small>@route.Links.Count links</small></span><strong class="route-length">@route.Length.ToString("0.##")<small>km</small></strong>
+                </button>
+            }
+        }
+    </div>
+</section>
+
+@code {
+    [Parameter, EditorRequired] public EditorDocument Document { get; set; } = null!;
+
+    private string _sourceId = "", _targetId = "";
+    private int _routeCount = 3;
+    private bool _collapsed;
+
+    private void ToggleCollapsed() => _collapsed = !_collapsed;
+
+    private static string NodeOption(EditorNode item) => string.Concat(item.Node.Type, " · ", item.Node.Id.ToString()[..5]);
+
+    private async Task RunKRoutes()
+    {
+        if (!Guid.TryParse(_sourceId, out var source) || !Guid.TryParse(_targetId, out var target)) return;
+        Document.PrepareRouteSearch();
+        StateHasChanged();
+        await Task.Delay(30);
+        Document.FindKRoutes(source, target, Math.Clamp(_routeCount, 1, 20));
+    }
+
+    private async Task RunMustPass()
+    {
+        if (!Guid.TryParse(_sourceId, out var source) || !Guid.TryParse(_targetId, out var target)) return;
+        Document.PrepareRouteSearch();
+        StateHasChanged();
+        await Task.Delay(30);
+        Document.FindMustPassRoute(source, target);
+    }
+}

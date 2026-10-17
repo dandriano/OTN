@@ -112,4 +112,35 @@ public class LinkTest
             Assert.Null(directed.Reverse);
         });
     }
+
+    [Fact]
+    public void Network_RemoveLink_RemovesUndirectedPair()
+    {
+        var network = new Network();
+        var nodeA = (NetNode)network.AddNetNode(NetNodeType.Terminal);
+        var nodeB = (NetNode)network.AddNetNode(NetNodeType.ROADM);
+        var forward = (Link)network.AddLink(nodeA, nodeB, 50.0, LinkType.Undirected);
+
+        Assert.True(network.RemoveLink(forward));
+        Assert.False(network.Optical.ContainsEdge(forward));
+        Assert.False(network.Optical.ContainsEdge(forward.Reverse!));
+        Assert.Equal(0, network.Optical.EdgeCount);
+        Assert.False(network.RemoveLink(forward));
+    }
+
+    [Fact]
+    public void Network_RemoveNetNode_RemovesIncidentLinks()
+    {
+        var network = new Network();
+        var nodeA = (NetNode)network.AddNetNode(NetNodeType.Terminal);
+        var nodeB = (NetNode)network.AddNetNode(NetNodeType.ROADM);
+        var nodeC = (NetNode)network.AddNetNode(NetNodeType.OLA);
+        network.AddLink(nodeA, nodeB, 50.0, LinkType.Undirected);
+        network.AddLink(nodeB, nodeC, 25.0, LinkType.Directed);
+
+        Assert.True(network.RemoveNetNode(nodeB));
+        Assert.False(network.Optical.ContainsVertex(nodeB));
+        Assert.Equal(0, network.Optical.EdgeCount);
+        Assert.False(network.RemoveNetNode(nodeB));
+    }
 }

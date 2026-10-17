@@ -54,31 +54,26 @@ public class Network
         return l;
     }
 
-    /// <summary>Changes a node's equipment type.</summary>
-    public void SetNodeType(NetNode node, NetNodeType type)
+    /// <summary>Removes a node and all optical links incident to it.</summary>
+    /// <returns><see langword="true"/> if the node was removed; otherwise, <see langword="false"/>.</returns>
+    public bool RemoveNetNode(NetNode node)
     {
         ArgumentNullException.ThrowIfNull(node);
-        if (!Optical.ContainsVertex(node))
-            throw new ArgumentException("The node is not part of this network.", nameof(node));
-
-        node.SetType(type);
+        return Optical.RemoveVertex(node);
     }
 
-    /// <summary>Replaces a link and its reverse edge, if present, with updated link data.</summary>
-    public Link UpdateLink(Link link, double length, LinkType linkType)
+    /// <summary>Removes a link and its reverse edge, if present.</summary>
+    /// <returns><see langword="true"/> if the link was removed; otherwise, <see langword="false"/>.</returns>
+    public bool RemoveLink(Link link)
     {
         ArgumentNullException.ThrowIfNull(link);
-        if (!Optical.ContainsEdge(link))
-            throw new ArgumentException("The link is not part of this network.", nameof(link));
+        if (!Optical.RemoveEdge(link))
+            return false;
 
-        var source = link.Source;
-        var target = link.Target;
-        var oldReverse = link.Reverse;
-        Optical.RemoveEdge(link);
-        if (oldReverse is not null && Optical.ContainsEdge(oldReverse))
-            Optical.RemoveEdge(oldReverse);
+        if (link.Reverse is { } reverse)
+            Optical.RemoveEdge(reverse);
 
-        return (Link)AddLink(source, target, length, linkType);
+        return true;
     }
 
     public IOtnNode AddOtnNode(NetNode node, IEnumerable<AggregationRule> rules, int capacity = 1)
