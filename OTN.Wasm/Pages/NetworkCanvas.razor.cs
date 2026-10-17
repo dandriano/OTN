@@ -8,15 +8,16 @@ using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
 using OTN.Core;
 using OTN.Enums;
+using OTN.Wasm.ViewModels;
 
-namespace OTN.Editor.Wasm.Pages;
+namespace OTN.Wasm.Pages;
 
 public partial class NetworkCanvas : ComponentBase, IDisposable
 {
     private enum EditorMode { Select, Edit }
     private enum CreationMode { Node, Link }
 
-    [Parameter, EditorRequired] public EditorDocument Document { get; set; } = null!;
+    [Parameter, EditorRequired] public NetworkEditorViewModel Document { get; set; } = null!;
     [Parameter] public double Zoom { get; set; } = 1;
     [Parameter] public EventCallback<double> ZoomChanged { get; set; }
     [Inject] private IJSRuntime JS { get; set; } = null!;
@@ -27,8 +28,8 @@ public partial class NetworkCanvas : ComponentBase, IDisposable
     private NetNodeType _newNodeType = NetNodeType.Terminal;
     private LinkType _newLinkType = LinkType.Undirected;
     private double _panX, _panY, _pointerX, _pointerY, _dragStartX, _dragStartY, _panStartX, _panStartY, _panOriginX, _panOriginY;
-    private EditorNode? _dragNode;
-    private EditorNode? _hoveredNode;
+    private NodeViewModel? _dragNode;
+    private NodeViewModel? _hoveredNode;
     private bool _panning;
     private HashSet<Link> _highlightedLinks = [];
 
@@ -36,7 +37,7 @@ public partial class NetworkCanvas : ComponentBase, IDisposable
 
     private void DocumentChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
-        if (e.PropertyName is nameof(EditorDocument.Revision) or nameof(EditorDocument.Routes) or nameof(EditorDocument.SelectedRouteIndex))
+        if (e.PropertyName is nameof(NetworkEditorViewModel.Revision) or nameof(NetworkEditorViewModel.Routes) or nameof(NetworkEditorViewModel.SelectedRouteIndex))
             _highlightedLinks = Document.SelectedRouteIndex >= 0 ? Document.Routes[Document.SelectedRouteIndex].Links.ToHashSet() : [];
         _ = InvokeAsync(StateHasChanged);
     }
@@ -49,7 +50,7 @@ public partial class NetworkCanvas : ComponentBase, IDisposable
         _panY = 0;
     }
 
-    private EditorNode NodeFor(NetNode node) => Document.Nodes.First(item => ReferenceEquals(item.Node, node));
+    private NodeViewModel NodeFor(NetNode node) => Document.Nodes.First(item => ReferenceEquals(item.Node, node));
     private string ActiveMode(EditorMode mode) => _mode == mode ? "active" : "";
     private string ActiveCreation(CreationMode mode) => _creationMode == mode ? "active" : "";
     private string ActiveNodeType(NetNodeType type) => _newNodeType == type ? "active" : "";
@@ -72,37 +73,48 @@ public partial class NetworkCanvas : ComponentBase, IDisposable
         if (mode != CreationMode.Link) Document.CancelPendingLinkCommand.Execute(null);
     }
 
-    private void SelectLink(EditorLink link) => Document.SelectLink(link);
+    private void SelectLink(LinkViewModel link) => Document.SelectLink(link);
 
     private void CanvasReady(CanvasBase canvas) => _canvas = canvas;
 
     private void DrawFrame(float timestamp)
     {
-        if (_canvas is null) return;
+        if (_canvas is null) 
+            return;
+
         var context = _canvas.RenderContext;
         context.ClearRect(0, 0, 1000, 680);
         context.FillStyle = "#f8fafc";
         context.FillRect(0, 0, 1000, 680);
         context.FillStyle = "#d9e1ea";
         for (var x = 12; x < 1000; x += 24)
+        {
             for (var y = 12; y < 680; y += 24)
             {
-                context.BeginPath(); context.Arc(x, y, 1, 0, MathF.PI * 2, false); context.Fill();
+                context.BeginPath(); 
+                context.Arc(x, y, 1, 0, MathF.PI * 2, false); 
+                context.Fill();
             }
+        }
         context.Save();
         context.Translate((float)_panX, (float)_panY);
         context.Scale((float)Zoom, (float)Zoom);
-        foreach (var item in Document.Links) DrawLink(context, item.Link);
+        foreach (var item in Document.Links) 
+            DrawLink(context, item.Link);
         if (Document.PendingLinkSource is { } pending)
         {
             context.StrokeStyle = "#3182e6"; context.LineWidth = 2;
-            context.BeginPath(); context.MoveTo((float)pending.X, (float)pending.Y); context.LineTo((float)_pointerX, (float)_pointerY); context.Stroke();
+            context.BeginPath(); 
+            context.MoveTo((float)pending.X, (float)pending.Y); 
+            context.LineTo((float)_pointerX, (float)_pointerY); 
+            context.Stroke();
         }
-        foreach (var item in Document.Nodes) DrawNode(context, item);
+        foreach (var item in Document.Nodes) 
+            DrawNode(context, item);
         if (Document.Nodes.Count == 0)
         {
             context.TextAlign = TextAlign.Center;
-            context.FillStyle = "#52667d"; context.Font = "700 18px sans-serif"; context.FillText("Your graph starts here", 500, 320);
+            context.FillStyle = "#52667d"; context.Font = "700 18px sans-serif"; context.FillText("Start here", 500, 320);
             context.FillStyle = "#92a0ae"; context.Font = "12px sans-serif"; context.FillText("Choose Edit → Node, then click anywhere on the canvas", 500, 348);
         }
         context.Restore();
@@ -154,11 +166,11 @@ public partial class NetworkCanvas : ComponentBase, IDisposable
         context.Stroke();
     }
 
-    private void DrawNode(IRenderContext context, EditorNode item)
+    private void DrawNode(IRenderContext context, NodeViewModel item)
     {
-        var fill = item.CtrlTagged
-            ? "#D2691E"
-            : _hoveredNode == item ? "#FFD700" : "#607D8B";
+        var required = Document.IsRequiredRouteNode(item);
+        var avoided = Document.IsAvoidedRouteNode(item);
+        var fill = required ? "#238653" : avoided ? "#c94f4f" : _hoveredNode == item ? "#FFD700" : "#607D8B";
 
         context.Save();
         context.Translate((float)(item.X - 17), (float)(item.Y - 17));
@@ -168,6 +180,14 @@ public partial class NetworkCanvas : ComponentBase, IDisposable
         else
             DrawTerminalArtwork(context);
         context.Restore();
+
+        if (required || avoided)
+        {
+            context.FillStyle = "#FFFFFF";
+            context.Font = "700 10px sans-serif";
+            context.TextAlign = TextAlign.Center;
+            context.FillText(required ? "R" : "A", (float)item.X + 11, (float)item.Y + 14);
+        }
 
         context.FillStyle = "#314156";
         context.Font = "700 10px sans-serif";
@@ -233,9 +253,16 @@ public partial class NetworkCanvas : ComponentBase, IDisposable
 
     private async Task<double[]> Point(PointerEventArgs e)
     {
-        if (_canvas is null) return [e.OffsetX, e.OffsetY];
-        try { return await JS.InvokeAsync<double[]>("otnEditor.point", _canvas.ElementReference, e.ClientX, e.ClientY); }
-        catch { return [e.OffsetX, e.OffsetY]; }
+        if (_canvas is null) 
+            return [e.OffsetX, e.OffsetY];
+        try 
+        { 
+            return await JS.InvokeAsync<double[]>("otnEditor.point", _canvas.ElementReference, e.ClientX, e.ClientY); 
+        }
+        catch 
+        { 
+            return [e.OffsetX, e.OffsetY]; 
+        }
     }
 
     private async Task CanvasPointerDown(PointerEventArgs e)
@@ -261,9 +288,10 @@ public partial class NetworkCanvas : ComponentBase, IDisposable
                 else Document.CompleteLink(hitNode, 100, _newLinkType);
                 return;
             }
-            if (e.CtrlKey) { Document.SetCtrlTag(hitNode, !hitNode.CtrlTagged); return; }
             if (_mode == EditorMode.Select)
             {
+                if (e.ShiftKey) { Document.ToggleRequiredRouteNode(hitNode); return; }
+                if (e.AltKey) { Document.ToggleAvoidedRouteNode(hitNode); return; }
                 Document.SelectNode(hitNode); _dragNode = hitNode;
                 _dragStartX = _pointerX - hitNode.X; _dragStartY = _pointerY - hitNode.Y;
             }
@@ -289,7 +317,7 @@ public partial class NetworkCanvas : ComponentBase, IDisposable
     private void CanvasPointerUp(PointerEventArgs e) { _dragNode = null; _panning = false; }
     private void CanvasPointerLeave(PointerEventArgs e) { CanvasPointerUp(e); _hoveredNode = null; }
 
-    private EditorNode? FindNodeAtPointer() => Document.Nodes.LastOrDefault(item =>
+    private NodeViewModel? FindNodeAtPointer() => Document.Nodes.LastOrDefault(item =>
         Math.Abs(item.X - _pointerX) <= 18 && Math.Abs(item.Y - _pointerY) <= 18);
 
     private double DistanceToLink(double x, double y, Link link)

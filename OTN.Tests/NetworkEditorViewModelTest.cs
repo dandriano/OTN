@@ -1,14 +1,14 @@
-using OTN.Editor;
+using OTN.Wasm.ViewModels;
 using OTN.Enums;
 
 namespace OTN.Tests;
 
-public class EditorDocumentTest
+public class NetworkEditorViewModelTest
 {
     [Fact]
     public void AddNode_StoresCanvasPositionAndSelectsNode()
     {
-        var document = new EditorDocument();
+        var document = new NetworkEditorViewModel();
 
         var node = document.AddNode(NetNodeType.ROADM, 123, 456);
 
@@ -20,7 +20,7 @@ public class EditorDocumentTest
     [Fact]
     public void SetNodeType_UpdatesTheOtnNode()
     {
-        var document = new EditorDocument();
+        var document = new NetworkEditorViewModel();
         var node = document.AddNode(NetNodeType.Terminal, 10, 20);
 
         document.SetNodeType(node, NetNodeType.ROADM);
@@ -31,7 +31,7 @@ public class EditorDocumentTest
     [Fact]
     public void PendingLink_CanBeCancelledAndRejectsSelfLink()
     {
-        var document = new EditorDocument();
+        var document = new NetworkEditorViewModel();
         var node = document.AddNode(NetNodeType.Terminal, 0, 0);
 
         document.BeginLink(node);
@@ -48,7 +48,7 @@ public class EditorDocumentTest
     [Fact]
     public void AddLink_CreatesDirectedAndUndirectedEdges()
     {
-        var document = new EditorDocument();
+        var document = new NetworkEditorViewModel();
         var first = document.AddNode(NetNodeType.Terminal, 0, 0);
         var second = document.AddNode(NetNodeType.ROADM, 100, 0);
 
@@ -64,7 +64,7 @@ public class EditorDocumentTest
     [Fact]
     public void UpdateLink_ReplacesReverseEdgeWhenDirectionChanges()
     {
-        var document = new EditorDocument();
+        var document = new NetworkEditorViewModel();
         var first = document.AddNode(NetNodeType.Terminal, 0, 0);
         var second = document.AddNode(NetNodeType.ROADM, 100, 0);
         var edge = document.AddLink(first, second, 25, LinkType.Undirected);
@@ -83,44 +83,55 @@ public class EditorDocumentTest
     }
 
     [Fact]
-    public void RouteCommands_FindKPathsAndVisitInRouteNodes()
+    public void RouteCommands_UseCurrentRequiredAndAvoidedSelections()
     {
-        var document = new EditorDocument();
+        var document = new NetworkEditorViewModel();
         var source = document.AddNode(NetNodeType.Terminal, 0, 0);
         var required = document.AddNode(NetNodeType.OLA, 100, 0);
         var target = document.AddNode(NetNodeType.Terminal, 200, 0);
         document.AddLink(source, required, 10, LinkType.Undirected);
         document.AddLink(required, target, 10, LinkType.Undirected);
         document.AddLink(source, target, 30, LinkType.Undirected);
-        document.SetRoutingRole(required, RouteNodeType.InRoute);
-
-        document.FindKRoutes(source.Node.Id, target.Node.Id, 2);
+        document.FindOpticRoutes(source.Node.Id, target.Node.Id, 2);
         Assert.Equal(2, document.Routes.Count);
         Assert.Equal(20, document.Routes[0].Length);
 
-        document.FindMustPassRoute(source.Node.Id, target.Node.Id);
+        var graphRevision = document.Revision;
+        document.SetRequiredRouteNode(required, true);
+        Assert.Equal(graphRevision, document.Revision);
+        Assert.Empty(document.Routes);
+        document.FindOpticRoutes(source.Node.Id, target.Node.Id, 20);
         Assert.Single(document.Routes);
         Assert.Contains(document.Routes[0].Links, link =>
+            ReferenceEquals(link.Source, required.Node) || ReferenceEquals(link.Target, required.Node));
+
+        document.SetAvoidedRouteNode(required, true);
+        Assert.False(document.IsRequiredRouteNode(required));
+        Assert.True(document.IsAvoidedRouteNode(required));
+        Assert.Empty(document.Routes);
+        document.FindOpticRoutes(source.Node.Id, target.Node.Id, 2);
+        Assert.Single(document.Routes);
+        Assert.DoesNotContain(document.Routes[0].Links, link =>
             ReferenceEquals(link.Source, required.Node) || ReferenceEquals(link.Target, required.Node));
     }
 
     [Fact]
     public void RouteSearch_ReportsUnreachableEndpointsAndGraphChangesClearResults()
     {
-        var document = new EditorDocument();
+        var document = new NetworkEditorViewModel();
         var source = document.AddNode(NetNodeType.Terminal, 0, 0);
         var target = document.AddNode(NetNodeType.Terminal, 100, 0);
 
-        document.FindKRoutes(source.Node.Id, target.Node.Id, 2);
+        document.FindOpticRoutes(source.Node.Id, target.Node.Id, 2);
         Assert.Empty(document.Routes);
         Assert.NotNull(document.RouteError);
 
         document.AddLink(source, target, 12, LinkType.Directed);
         Assert.Null(document.RouteError);
-        document.FindKRoutes(source.Node.Id, target.Node.Id, 1);
+        document.FindOpticRoutes(source.Node.Id, target.Node.Id, 1);
         Assert.Single(document.Routes);
 
-        document.SetRoutingRole(target, RouteNodeType.OutRoute);
+        document.SetAvoidedRouteNode(target, true);
         Assert.Empty(document.Routes);
         Assert.Null(document.RouteError);
     }

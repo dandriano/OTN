@@ -11,6 +11,7 @@ public class NNRoutingBenchmark
     private Network _network = null!;
     private NetNode _source = null!;
     private NetNode _target = null!;
+    private RouteConstraints _constraints = null!;
 
     [Params(35, 100)]
     public int TotalNodes { get; set; }
@@ -30,11 +31,11 @@ public class NNRoutingBenchmark
     [GlobalSetup]
     public void Setup()
     {
-        (_network, _source, _target) = BenchmarkNetworkInputs.Create(
+        (_network, _source, _target, _constraints) = BenchmarkNetworkInputs.Create(
             TotalNodes, BackboneNodes, ConnectionAttemptUpperBound, MustPassNodes, MustAvoidNodes, seed: 271);
     }
 
     [Benchmark]
     public List<Link> FindOpticPaths_Benchmark() 
-        => _network.Optical.FindMustPassOpticPath(_source, _target);
+        => _network.Optical.FindOpticPath(_source, _target, constraints: _constraints)[0];
 }

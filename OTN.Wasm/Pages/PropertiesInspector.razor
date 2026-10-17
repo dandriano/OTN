@@ -10,7 +10,6 @@
         {
             <div class="selected-kind"><span class="kind-icon @NodeClass(selectedNode.Node.Type)"><EditorObjectIcon NodeType="selectedNode.Node.Type" /></span><div><strong>Network node</strong><small>@selectedNode.Node.Id</small></div></div>
             <label class="field-label">Node type</label><select class="field" value="@selectedNode.Node.Type" @onchange="e => ChangeNodeType(selectedNode, e.Value?.ToString())"><option>Terminal</option><option>OLA</option><option>ROADM</option></select>
-            <label class="field-label">Routing role</label><select class="field" value="@selectedNode.Node.RoutingRole" @onchange="e => ChangeNodeRole(selectedNode, e.Value?.ToString())"><option value="Undefined">Undefined</option><option value="InRoute">In route</option><option value="OutRoute">Out route</option></select>
             <div class="readonly-row"><span>Canvas position</span><strong>@selectedNode.X.ToString("0"), @selectedNode.Y.ToString("0")</strong></div>
         }
         else if (Document.SelectedLink is { } selectedLink)
@@ -25,9 +24,9 @@
 </section>
 
 @code {
-    [Parameter, EditorRequired] public EditorDocument Document { get; set; } = null!;
+    [Parameter, EditorRequired] public NetworkEditorViewModel Document { get; set; } = null!;
 
-    private EditorLink? _inspectedLink;
+    private LinkViewModel? _inspectedLink;
     private string _linkWeight = "100";
     private LinkType _linkDirection = LinkType.Undirected;
     private bool _collapsed;
@@ -50,10 +49,8 @@
     }
 
     private static string NodeClass(NetNodeType type) => type.ToString().ToLowerInvariant();
-    private void ChangeNodeType(EditorNode node, string? value) { if (Enum.TryParse<NetNodeType>(value, out var type)) Document.SetNodeType(node, type); }
-    private void ChangeNodeRole(EditorNode node, string? value) { if (Enum.TryParse<RouteNodeType>(value, out var role)) Document.SetRoutingRole(node, role); }
-
-    private void UpdateSelectedLink(EditorLink link)
+    private void ChangeNodeType(NodeViewModel node, string? value) { if (Enum.TryParse<NetNodeType>(value, out var type)) Document.SetNodeType(node, type); }
+    private void UpdateSelectedLink(LinkViewModel link)
     {
         if (double.TryParse(_linkWeight, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var weight))
             Document.UpdateLink(link, weight, _linkDirection);

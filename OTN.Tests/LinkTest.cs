@@ -13,7 +13,7 @@ public class LinkTest
         var nodeB = new NetNode(NetNodeType.ROADM);
         const double length = 42.5;
 
-        var forward = new Link(nodeA, nodeB, length, LinkType.Undirected);
+        var forward = new Link(nodeA, nodeB, length);
         var reverse = new Link(forward);
 
         Assert.Multiple(() =>
@@ -56,7 +56,7 @@ public class LinkTest
         var nodeA = new NetNode(NetNodeType.Terminal);
         var nodeB = new NetNode(NetNodeType.ROADM);
 
-        var forward = new Link(nodeA, nodeB, 10.0, LinkType.Undirected);
+        var forward = new Link(nodeA, nodeB, 10.0);
         _ = new Link(forward);
 
         // Attempting to create a second reverse for the same forward link
@@ -82,10 +82,10 @@ public class LinkTest
     public void Network_AddLink_AddsUndirectedPair()
     {
         var network = new Network();
-        var nodeA = (NetNode)network.AddNetNode(NetNodeType.Terminal);
-        var nodeB = (NetNode)network.AddNetNode(NetNodeType.ROADM);
+        var nodeA = (NetNode)network.Add(NetNodeType.Terminal);
+        var nodeB = (NetNode)network.Add(NetNodeType.ROADM);
 
-        var forward = (Link)network.AddLink(nodeA, nodeB, 50.0, LinkType.Undirected);
+        var forward = (Link)network.Add(nodeA, nodeB, 50.0, LinkType.Undirected);
 
         Assert.Multiple(() =>
         {
@@ -100,10 +100,10 @@ public class LinkTest
     public void Network_AddLink_AddsSingleDirectedEdge()
     {
         var network = new Network();
-        var nodeA = (NetNode)network.AddNetNode(NetNodeType.Terminal);
-        var nodeB = (NetNode)network.AddNetNode(NetNodeType.ROADM);
+        var nodeA = (NetNode)network.Add(NetNodeType.Terminal);
+        var nodeB = (NetNode)network.Add(NetNodeType.ROADM);
 
-        var directed = (Link)network.AddLink(nodeA, nodeB, 50.0, LinkType.Directed);
+        var directed = (Link)network.Add(nodeA, nodeB, 50.0, LinkType.Directed);
 
         Assert.Multiple(() =>
         {
@@ -117,30 +117,48 @@ public class LinkTest
     public void Network_RemoveLink_RemovesUndirectedPair()
     {
         var network = new Network();
-        var nodeA = (NetNode)network.AddNetNode(NetNodeType.Terminal);
-        var nodeB = (NetNode)network.AddNetNode(NetNodeType.ROADM);
-        var forward = (Link)network.AddLink(nodeA, nodeB, 50.0, LinkType.Undirected);
+        var nodeA = (NetNode)network.Add(NetNodeType.Terminal);
+        var nodeB = (NetNode)network.Add(NetNodeType.ROADM);
+        var forward = (Link)network.Add(nodeA, nodeB, 50.0, LinkType.Undirected);
 
-        Assert.True(network.RemoveLink(forward));
+        Assert.True(network.Remove(forward));
         Assert.False(network.Optical.ContainsEdge(forward));
         Assert.False(network.Optical.ContainsEdge(forward.Reverse!));
         Assert.Equal(0, network.Optical.EdgeCount);
-        Assert.False(network.RemoveLink(forward));
+        Assert.False(network.Remove(forward));
     }
 
     [Fact]
     public void Network_RemoveNetNode_RemovesIncidentLinks()
     {
         var network = new Network();
-        var nodeA = (NetNode)network.AddNetNode(NetNodeType.Terminal);
-        var nodeB = (NetNode)network.AddNetNode(NetNodeType.ROADM);
-        var nodeC = (NetNode)network.AddNetNode(NetNodeType.OLA);
-        network.AddLink(nodeA, nodeB, 50.0, LinkType.Undirected);
-        network.AddLink(nodeB, nodeC, 25.0, LinkType.Directed);
+        var nodeA = (NetNode)network.Add(NetNodeType.Terminal);
+        var nodeB = (NetNode)network.Add(NetNodeType.ROADM);
+        var nodeC = (NetNode)network.Add(NetNodeType.OLA);
+        network.Add(nodeA, nodeB, 50.0, LinkType.Undirected);
+        network.Add(nodeB, nodeC, 25.0, LinkType.Directed);
 
-        Assert.True(network.RemoveNetNode(nodeB));
+        Assert.True(network.Remove(nodeB));
         Assert.False(network.Optical.ContainsVertex(nodeB));
         Assert.Equal(0, network.Optical.EdgeCount);
-        Assert.False(network.RemoveNetNode(nodeB));
+        Assert.False(network.Remove(nodeB));
+    }
+
+    [Fact]
+    public void Network_UpdateLink_ReplacesTheWholePair()
+    {
+        var network = new Network();
+        var nodeA = (NetNode)network.Add(NetNodeType.Terminal);
+        var nodeB = (NetNode)network.Add(NetNodeType.ROADM);
+        var original = network.Add(nodeA, nodeB, 50.0, LinkType.Undirected);
+
+        var updated = network.Update(original, 25.0, LinkType.Directed);
+
+        Assert.DoesNotContain(network.Optical.Edges, edge => ReferenceEquals(edge, original));
+        Assert.DoesNotContain(network.Optical.Edges, edge => ReferenceEquals(edge, original.Reverse));
+        Assert.Contains(network.Optical.Edges, edge => ReferenceEquals(edge, updated));
+        Assert.Equal(1, network.Optical.EdgeCount);
+        Assert.Equal(25.0, updated.Tag);
+        Assert.Equal(LinkType.Directed, updated.LinkType);
     }
 }

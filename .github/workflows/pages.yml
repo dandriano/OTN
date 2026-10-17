@@ -1,0 +1,69 @@
+name: deploy demo
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - name: Run solution tests
+        run: |
+          docker run --rm \
+            --volume "$GITHUB_WORKSPACE:/src" \
+            --workdir /src \
+            mcr.microsoft.com/dotnet/sdk:8.0-jammy \
+            bash -c 'dotnet test OTN.sln --configuration Release'
+
+      - name: Publish wasm app
+        run: |
+          docker run --rm \
+            --volume "$GITHUB_WORKSPACE:/src" \
+            --workdir /src \
+            mcr.microsoft.com/dotnet/sdk:8.0-jammy \
+            bash -c 'dotnet restore OTN.Wasm && dotnet publish OTN.Wasm -c Release -p:PublishTrimmed=true -o publish'
+
+      - name: Set publish file ownership
+        run: sudo chown -R "$(id -u):$(id -g)" publish
+
+      - name: Prepare site files
+        run: |
+          sed -i 's|<base href="/" />|<base href="/OTN/" />|' publish/wwwroot/index.html
+          grep -q '<base href="/OTN/" />' publish/wwwroot/index.html
+          touch publish/wwwroot/.nojekyll
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: publish/wwwroot
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy demo to github
+        id: deployment
+        uses: actions/deploy-pages@v4

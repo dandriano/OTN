@@ -10,25 +10,8 @@ namespace OTN.Core;
 public class NetNode : INetNode
 {
     public Guid Id { get; init; } = Guid.NewGuid();
-    public NetNodeType Type { get; private set; }
-    public RouteNodeType RoutingRole { get; private set; } = RouteNodeType.Undefined;
-
-    public NetNode(NetNodeType type, RouteNodeType routeRole) : this(type)
-    {
-        RoutingRole = routeRole;
-    }
-
+    public NetNodeType Type { get; set; }
     public NetNode(NetNodeType type)
-    {
-        Type = type;
-    }
-
-    public void SetRouteRole(RouteNodeType role)
-    {
-        RoutingRole = role;
-    }
-
-    public void SetType(NetNodeType type)
     {
         Type = type;
     }

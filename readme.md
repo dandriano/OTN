@@ -38,9 +38,9 @@ The [`NetNode`](/OTN/Core/NetNode.cs) represents a real location with typical DW
 
 # OTN.Wasm
 
-A CAD-like application demo.
+A CAD-like application demo ([live](https://dandriano.github.io/OTN/)).
 
-Run it via docker (image size is somewhat ~20 Mb)
+Alternatively, run it via docker (image size is somewhat ~20 Mb)
 
 ```
 git clone https://github.com/dandriano/OTN.git

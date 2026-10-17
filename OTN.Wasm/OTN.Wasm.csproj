@@ -3,7 +3,7 @@
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>
-    <RootNamespace>OTN.Editor.Wasm</RootNamespace>
+    <RootNamespace>OTN.Wasm</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>
@@ -12,7 +12,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\OTN.Editor\OTN.Editor.csproj" />
+    <ProjectReference Include="..\OTN\OTN.csproj" />
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
     <PackageReference Include="Blazorex" Version="1.1.0" />
   </ItemGroup>
 

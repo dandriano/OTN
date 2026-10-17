@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using OTN.Enums;
 using OTN.Extensions;
 using OTN.Interfaces;
@@ -12,69 +13,112 @@ namespace OTN.Core;
 /// </summary>
 public class Network
 {
+    private readonly BidirectionalGraph<NetNode, Link> _optical 
+        = new BidirectionalGraph<NetNode, Link>();
+    private readonly BidirectionalGraph<OtnNode, Signal> _electrical 
+        = new BidirectionalGraph<OtnNode, Signal>();
     private readonly Dictionary<Guid, OtnSignal> _signalMap
         = new Dictionary<Guid, OtnSignal>();
 
     public Guid Id { get; } = Guid.NewGuid();
 
-    public BidirectionalGraph<NetNode, Link> Optical { get; }
-        = new BidirectionalGraph<NetNode, Link>();
+    public IVertexAndEdgeListGraph<NetNode, Link> Optical => _optical;
 
-    public BidirectionalGraph<OtnNode, Signal> Electrical { get; }
-        = new BidirectionalGraph<OtnNode, Signal>();
+    public IVertexAndEdgeListGraph<OtnNode, Signal> Electrical => _electrical;
     
     public Network() {}
 
-    public Network(BidirectionalGraph<NetNode, Link> optical)
+    public Network(IVertexAndEdgeListGraph<NetNode, Link> optical)
     {
-        Optical = optical;
+        ArgumentNullException.ThrowIfNull(optical);
+        _optical.AddVertexRange(optical.Vertices);
+        _optical.AddEdgeRange(optical.Edges);
     }
 
-    public INetNode AddNetNode(NetNodeType type)
+    public INetNode Add(NetNodeType type)
     {
         var n = new NetNode(type);
-        if (!Optical.AddVertex(n))
+        if (!_optical.AddVertex(n))
             throw new InvalidOperationException();
         return n;
     }
 
-    public ILink AddLink(NetNode source, NetNode target, double length, LinkType linkType = LinkType.Undirected)
+    public Link Add(NetNode source, NetNode target, double length, LinkType type)
     {
-        var l = new Link(source, target, length, linkType);
-        if (!Optical.AddEdge(l))
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(target);
+        if (ReferenceEquals(source, target))
+            throw new ArgumentException("A node cannot be linked to itself.", nameof(target));
+        if (!double.IsFinite(length) || length < 0)
+            throw new ArgumentOutOfRangeException(nameof(length), "Link weight must be a finite non-negative value.");
+        if (!_optical.ContainsVertex(source) || !_optical.ContainsVertex(target))
+            throw new ArgumentException("Both link endpoints must belong to this network.");
+        if (type is not LinkType.Directed and not LinkType.Undirected)
+            throw new ArgumentOutOfRangeException(nameof(type));
+
+        var l = new Link(source, target, length, type);
+        if (!_optical.AddEdge(l))
             throw new InvalidOperationException();
 
-        if (linkType == LinkType.Undirected)
+        if (type == LinkType.Undirected)
         {
-            var r = new Link(l);
-            if (!Optical.AddEdge(r))
+            var reverse = new Link(l);
+            if (!_optical.AddEdge(reverse))
+            {
+                _optical.RemoveEdge(l);
                 throw new InvalidOperationException();
+            }
         }
 
         return l;
     }
 
+    /// <summary>Replaces a link and, when present, its reverse edge with links of the requested type and weight.</summary>
+    public Link Update(Link link, double length, LinkType type)
+    {
+        ArgumentNullException.ThrowIfNull(link);
+        if (!double.IsFinite(length) || length < 0)
+            throw new ArgumentOutOfRangeException(nameof(length), "Link weight must be a finite non-negative value.");
+        if (type is not LinkType.Directed and not LinkType.Undirected)
+            throw new ArgumentOutOfRangeException(nameof(type));
+        if (!Contains(link))
+            throw new ArgumentException("The link is not part of this network.", nameof(link));
+
+        var source = link.Source;
+        var target = link.Target;
+
+        Remove(link);
+        return Add(source, target, length, type);
+    }
+
     /// <summary>Removes a node and all optical links incident to it.</summary>
     /// <returns><see langword="true"/> if the node was removed; otherwise, <see langword="false"/>.</returns>
-    public bool RemoveNetNode(NetNode node)
+    public bool Remove(NetNode node)
     {
         ArgumentNullException.ThrowIfNull(node);
-        return Optical.RemoveVertex(node);
+        return _optical.RemoveVertex(node);
     }
 
     /// <summary>Removes a link and its reverse edge, if present.</summary>
     /// <returns><see langword="true"/> if the link was removed; otherwise, <see langword="false"/>.</returns>
-    public bool RemoveLink(Link link)
+    public bool Remove(Link link)
     {
         ArgumentNullException.ThrowIfNull(link);
-        if (!Optical.RemoveEdge(link))
+        if (!Contains(link))
+            return false;
+
+        if (!_optical.RemoveEdge(link))
             return false;
 
         if (link.Reverse is { } reverse)
-            Optical.RemoveEdge(reverse);
+            _optical.RemoveEdge(reverse);
 
         return true;
     }
+
+    private bool Contains(Link link)
+        => _optical.TryGetEdges(link.Source, link.Target, out var edges) &&
+            edges.Any(existing => ReferenceEquals(existing, link));
 
     public IOtnNode AddOtnNode(NetNode node, IEnumerable<AggregationRule> rules, int capacity = 1)
     {
@@ -84,7 +128,7 @@ public class Network
     public IOtnNode AddOtnNode(NetNode node, IEnumerable<AggregationRule> rules, IOtnSettings settings, int capacity = 1)
     {
         var n = new OtnNode(node, rules, settings, capacity);
-        if (!Electrical.AddVertex(n))
+        if (!_electrical.AddVertex(n))
             throw new InvalidOperationException();
         return n;
     }
@@ -98,7 +142,7 @@ public class Network
     {
         if (signal is IOtnSignal)
             throw new InvalidOperationException();
-        else if (!(Electrical.ContainsVertex(signal.Source) && Electrical.ContainsVertex(signal.Target)))
+        else if (!(_electrical.ContainsVertex(signal.Source) && _electrical.ContainsVertex(signal.Target)))
             throw new InvalidOperationException();
 
         // TODO: use _requirements to decide aggregation

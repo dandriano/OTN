@@ -11,6 +11,7 @@ public class KPathRoutingBenchmark
     private Network _network = null!;
     private NetNode _source = null!;
     private NetNode _target = null!;
+    private RouteConstraints _constraints = null!;
 
     [Params(35, 100)]
     public int TotalNodes { get; set; }
@@ -27,11 +28,11 @@ public class KPathRoutingBenchmark
     [GlobalSetup]
     public void Setup()
     {
-        (_network, _source, _target) = BenchmarkNetworkInputs.Create(
-            TotalNodes, BackboneNodes, ConnectionAttemptUpperBound, mustPassNodes: 0, mustAvoidNodes: 0, seed: 137);
+        (_network, _source, _target, _constraints) = BenchmarkNetworkInputs.Create(
+            TotalNodes, BackboneNodes, ConnectionAttemptUpperBound, requiredNodeCount: 0, avoidedNodeCount: 0, seed: 137);
     }
 
     [Benchmark]
     public List<List<Link>> FindOpticPaths_Benchmark() 
-        => _network.Optical.FindOpticPath(_source, _target, PathCount);
+        => _network.Optical.FindOpticPath(_source, _target, _constraints, PathCount);
 }

@@ -1,3 +1,5 @@
+@implements IDisposable
+
 <section class="panel-section routing-section">
     <div class="section-heading">
         <div>
@@ -8,8 +10,23 @@
     <div id="route-finder-content" hidden="@_collapsed">
         <label class="field-label">Source</label><select class="field" @bind="_sourceId"><option value="">Select source</option>@foreach (var item in Document.Nodes) { <option value="@item.Node.Id">@NodeOption(item)</option> }</select>
         <label class="field-label">Target</label><select class="field" @bind="_targetId"><option value="">Select target</option>@foreach (var item in Document.Nodes) { <option value="@item.Node.Id">@NodeOption(item)</option> }</select>
-        <div class="route-controls"><label><span>K shortest</span><input type="number" min="1" max="20" @bind="_routeCount" /></label><button class="primary-button" disabled="@Document.IsRouting" @onclick="RunKRoutes">Find routes</button></div>
-        <button class="secondary-button full-width" disabled="@Document.IsRouting" @onclick="RunMustPass">Find must-pass route <span>→</span></button>
+        <div class="constraint-group">
+            <label class="field-label">Required nodes</label>
+            @if (Document.Nodes.Count == 0) { <small>Add nodes to set route constraints.</small> }
+            @foreach (var item in Document.Nodes)
+            {
+                <label class="constraint-option" @key="item.Node.Id"><input type="checkbox" checked="@Document.IsRequiredRouteNode(item)" @onchange="e => Document.SetRequiredRouteNode(item, e.Value is true)" />@NodeOption(item)</label>
+            }
+        </div>
+        <div class="constraint-group">
+            <label class="field-label">Avoided nodes</label>
+            @foreach (var item in Document.Nodes)
+            {
+                <label class="constraint-option" @key="item.Node.Id"><input type="checkbox" checked="@Document.IsAvoidedRouteNode(item)" @onchange="e => Document.SetAvoidedRouteNode(item, e.Value is true)" />@NodeOption(item)</label>
+            }
+        </div>
+        <div class="route-controls"><label><span>K shortest</span><input type="number" min="1" max="20" @bind="_routeCount" disabled="@(Document.RequiredRouteNodes.Count > 0)" /></label><button class="primary-button" disabled="@Document.IsRouting" @onclick="RunSearch">Find route(s)</button></div>
+        @if (Document.RequiredRouteNodes.Count > 0) { <small class="constraint-note">Required nodes are visited in nearest-first order. K is inactive.</small> }
         @if (Document.IsRouting) { <div class="route-status"><span class="spinner"></span>Searching routes…</div> }
         @if (Document.RouteError is { } error) { <div class="error-message"><strong>Route search failed</strong><span>@error</span></div> }
         @if (Document.Routes.Count > 0)
@@ -27,31 +44,39 @@
 </section>
 
 @code {
-    [Parameter, EditorRequired] public EditorDocument Document { get; set; } = null!;
+    [Parameter, EditorRequired] public NetworkEditorViewModel Document { get; set; } = null!;
 
     private string _sourceId = "", _targetId = "";
     private int _routeCount = 3;
     private bool _collapsed;
+    private NetworkEditorViewModel? _subscribedDocument;
 
     private void ToggleCollapsed() => _collapsed = !_collapsed;
 
-    private static string NodeOption(EditorNode item) => string.Concat(item.Node.Type, " · ", item.Node.Id.ToString()[..5]);
-
-    private async Task RunKRoutes()
+    protected override void OnParametersSet()
     {
-        if (!Guid.TryParse(_sourceId, out var source) || !Guid.TryParse(_targetId, out var target)) return;
-        Document.PrepareRouteSearch();
-        StateHasChanged();
-        await Task.Delay(30);
-        Document.FindKRoutes(source, target, Math.Clamp(_routeCount, 1, 20));
+        if (ReferenceEquals(_subscribedDocument, Document)) return;
+        if (_subscribedDocument is not null) _subscribedDocument.PropertyChanged -= DocumentChanged;
+        _subscribedDocument = Document;
+        _subscribedDocument.PropertyChanged += DocumentChanged;
     }
 
-    private async Task RunMustPass()
+    private void DocumentChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e) =>
+        _ = InvokeAsync(StateHasChanged);
+
+    public void Dispose()
+    {
+        if (_subscribedDocument is not null) _subscribedDocument.PropertyChanged -= DocumentChanged;
+    }
+
+    private static string NodeOption(NodeViewModel item) => string.Concat(item.Node.Type, " · ", item.Node.Id.ToString()[..5]);
+
+    private async Task RunSearch()
     {
         if (!Guid.TryParse(_sourceId, out var source) || !Guid.TryParse(_targetId, out var target)) return;
         Document.PrepareRouteSearch();
         StateHasChanged();
         await Task.Delay(30);
-        Document.FindMustPassRoute(source, target);
+        Document.FindOpticRoutes(source, target, Math.Clamp(_routeCount, 1, 20));
     }
 }

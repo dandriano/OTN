@@ -11,10 +11,10 @@ namespace OTN.Core;
 public class Link : EquatableTaggedEdge<NetNode, double>, IEdge<NetNode>, ILink
 {
     public Guid Id { get; } = Guid.NewGuid();
-    public LinkType LinkType { get; }
+    public LinkType LinkType { get; private set; }
     public Link? Reverse { get; private set; }
 
-    public Link(NetNode source, NetNode target, double weight, LinkType linkType = LinkType.Undirected) 
+    public Link(NetNode source, NetNode target, double weight, LinkType linkType = LinkType.Undirected)
         : base(source, target, weight)
     {
         LinkType = linkType;
@@ -31,8 +31,8 @@ public class Link : EquatableTaggedEdge<NetNode, double>, IEdge<NetNode>, ILink
         if (reverse.Reverse is not null)
             throw new InvalidOperationException("Link already has a reverse link assigned.");
 
-        LinkType = reverse.LinkType;
         Reverse = reverse;
         reverse.Reverse = this;
+        LinkType = LinkType.Undirected;
     }
 }

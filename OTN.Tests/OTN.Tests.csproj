@@ -21,7 +21,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\OTN\OTN.csproj" />
-    <ProjectReference Include="..\OTN.Editor\OTN.Editor.csproj" />
+    <ProjectReference Include="..\OTN.Wasm\OTN.Wasm.csproj" />
   </ItemGroup>
 
 </Project>

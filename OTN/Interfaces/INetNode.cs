@@ -7,5 +7,4 @@ public interface INetNode
 {
     Guid Id { get; }
     NetNodeType Type { get; }
-    RouteNodeType RoutingRole { get; }
 }

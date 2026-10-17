@@ -4,7 +4,6 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using OTN.Core;
-using OTN.Enums;
 using QuikGraph;
 using QuikGraph.Algorithms;
 
@@ -12,6 +11,18 @@ namespace OTN.Extensions;
 
 public static class RoutingExtensions
 {
+    private sealed class RoutingWeight(RouteConstraints constraints, HashSet<Guid>? blockedEdges = null, HashSet<Guid>? blockedNodes = null)
+    {
+        public double GetWeight(Link edge)
+        {
+            if (constraints.AvoidedNodes.Contains(edge.Source) || constraints.AvoidedNodes.Contains(edge.Target) ||
+                (blockedEdges?.Contains(edge.Id) ?? false) ||
+                (blockedNodes?.Contains(edge.Source.Id) ?? false) || (blockedNodes?.Contains(edge.Target.Id) ?? false))
+                return double.PositiveInfinity;
+            return edge.Tag;
+        }
+    }
+
     private static IEnumerable<NetNode> GetNodesFromPath(this IEnumerable<Link> path)
     {
         using var enumerator = path.GetEnumerator();
@@ -20,18 +31,11 @@ public static class RoutingExtensions
 
         yield return enumerator.Current.Source;
 
-        do
-        {
+        do 
+        { 
             yield return enumerator.Current.Target;
-        } while (enumerator.MoveNext());
-    }
-
-    private static double CalculateLength(this Link link)
-    {
-        if (link.Source.RoutingRole == RouteNodeType.OutRoute || link.Target.RoutingRole == RouteNodeType.OutRoute)
-            return double.PositiveInfinity;
-
-        return link.Tag;
+        }
+        while (enumerator.MoveNext());
     }
 
     /// <summary>
@@ -41,6 +45,7 @@ public static class RoutingExtensions
     /// <param name="source">The starting node for the paths.</param>
     /// <param name="target">The destination node for the paths.</param>
     /// <param name="k">The number of shortest paths to find.</param>
+    /// <param name="cancellationToken">A token used to cancel the search.</param>
     /// <returns>
     /// A list of paths, where each path is a list of <see cref="Link"/> objects representing edges in the path.
     /// </returns>
@@ -57,208 +62,188 @@ public static class RoutingExtensions
         ArgumentNullException.ThrowIfNull(target);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(k);
 
-        // Initial Dijkstra from source
-        var dijkstra = graph.ShortestPathsDijkstra(CalculateLength, source);
-        cancellationToken.ThrowIfCancellationRequested();
+        var constraints = RouteConstraints.Empty;
+        return FindKShortestPaths(graph, source, target, k, constraints, cancellationToken);
+    }
 
+    /// <summary>
+    /// Finds one route through required nodes, or up to <paramref name="k"/> shortest paths when none are required.
+    /// Avoided nodes are excluded in either case.
+    /// </summary>
+    /// <param name="graph">The graph representing the optical network.</param>
+    /// <param name="source">The starting node for the paths.</param>
+    /// <param name="target">The destination node for the paths.</param>
+    /// <param name="constraints">Required and avoided nodes for this search.</param>
+    /// <param name="k">The maximum number of paths when no nodes are required.</param>
+    /// <param name="cancellationToken">A token used to cancel the search.</param>
+    /// <returns>A list of paths, each represented by its ordered links.</returns>
+    /// <exception cref="ArgumentException">A constraint refers to a node outside the graph.</exception>
+    /// <exception cref="NoPathFoundException">The constraints cannot be satisfied by a route.</exception>
+    public static List<List<Link>> FindOpticPath(
+        this IVertexAndEdgeListGraph<NetNode, Link> graph,
+        NetNode source,
+        NetNode target,
+        RouteConstraints constraints,
+        int k = 1,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(graph);
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(target);
+        ArgumentNullException.ThrowIfNull(constraints);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(k);
+
+        if (constraints.AvoidedNodes.Contains(source) || constraints.AvoidedNodes.Contains(target))
+            throw new NoPathFoundException("The source or target is avoided, so no route can be found.");
+
+        if (constraints.RequiredNodes.Count > 0)
+            return [FindRequiredNodePath(graph, source, target, constraints, cancellationToken)];
+
+        return FindKShortestPaths(graph, source, target, k, constraints, cancellationToken);
+    }
+
+    private static List<List<Link>> FindKShortestPaths(
+        IVertexAndEdgeListGraph<NetNode, Link> graph,
+        NetNode source,
+        NetNode target,
+        int k,
+        RouteConstraints constraints,
+        CancellationToken cancellationToken)
+    {
+        if (constraints.AvoidedNodes.Contains(source) || constraints.AvoidedNodes.Contains(target))
+            throw new NoPathFoundException("The source or target is avoided, so no route can be found.");
+
+        var initialWeight = new RoutingWeight(constraints);
+        var dijkstra = graph.ShortestPathsDijkstra(initialWeight.GetWeight, source);
+        cancellationToken.ThrowIfCancellationRequested();
         if (!dijkstra(target, out var initialPath))
             throw new NoPathFoundException($"No path between {source}/{target}");
 
-        // Store initial path and its nodes
-        var result = new List<List<Link>>() { initialPath!.ToList() };
-        var resultNodes = new List<List<NetNode>>() { result[0].GetNodesFromPath().ToList() };
-
-        // Signatures to avoid duplicates (path-node sequence)
-        var signatures = new HashSet<string>
+        var result = new List<List<Link>> { initialPath!.ToList() };
+        var resultNodes = new List<List<NetNode>> { GetNodesFromPath(result[0]).ToList() };
+        
+        var signature = new StringBuilder();
+        foreach (var node in resultNodes[0])
         {
-            string.Join(">", resultNodes[0].Select(n => n.Id))
-        };
-
-        // Candidate paths (shortest first)
+            if (signature.Length > 0) 
+                signature.Append('>');
+            signature.Append(node.Id);
+        }
+        
+        var signatures = new HashSet<string> { signature.ToString()};
         var candidates = new PriorityQueue<List<Link>, double>();
 
-        // Seed with the signature of the initial path
-        // (We already added initial path, so start loop from i=2)
         for (var i = 2; i <= k; i++)
         {
             cancellationToken.ThrowIfCancellationRequested();
-
             var lastPath = result[^1];
             var lastNodes = resultNodes[^1];
 
-            // Spur loop
             for (var spurIdx = 0; spurIdx < lastNodes.Count - 1; spurIdx++)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-
                 var spurNode = lastNodes[spurIdx];
                 var rootNodes = lastNodes.GetRange(0, spurIdx + 1);
-
                 var fullPath = new List<Link>();
-                double costRoot = 0d;
-                foreach (var e in lastPath.Take(spurIdx))
+                var costRoot = 0d;
+                foreach (var edge in lastPath.Take(spurIdx))
                 {
-                    fullPath.Add(e);
-                    costRoot += e.Tag;
+                    fullPath.Add(edge);
+                    costRoot += edge.Tag;
                 }
 
-                // Edges to remove to avoid replicating previous root path (same root)
                 var removedEdges = new HashSet<Guid>();
                 for (var rIdx = 0; rIdx < result.Count; rIdx++)
                 {
-                    var pNodes = resultNodes[rIdx];
-                    if (pNodes.Count > spurIdx + 1 && pNodes.GetRange(0, spurIdx + 1).SequenceEqual(rootNodes))
+                    var pathNodes = resultNodes[rIdx];
+                    if (pathNodes.Count > spurIdx + 1 && pathNodes.GetRange(0, spurIdx + 1).SequenceEqual(rootNodes))
                         removedEdges.Add(result[rIdx][spurIdx].Id);
                 }
 
-                // Block edges that either are in removedEdges or touch any node in rootNodes except the spurNode
-                var blockedNodes = new HashSet<NetNode>();
-                for (int n = 0; n < spurIdx; n++) 
-                    blockedNodes.Add(lastNodes[n]);
+                var blockedNodes = new HashSet<Guid>();
+                for (var n = 0; n < spurIdx; n++) 
+                    blockedNodes.Add(lastNodes[n].Id);
 
-                Func<Link, double> weight = e =>
-                {
-                    if (removedEdges.Contains(e.Id)) 
-                        return double.PositiveInfinity;
-
-                    if (blockedNodes.Contains(e.Source) || blockedNodes.Contains(e.Target)) 
-                        return double.PositiveInfinity;
-
-                    return e.CalculateLength();
-                };
-
-                // Run Dijkstra from spurNode to target using the filtered graph
-                var spurDijkstra = graph.ShortestPathsDijkstra(weight, spurNode);
-                if (!spurDijkstra(target, out var spurPath))
+                var spurWeight = new RoutingWeight(constraints, removedEdges, blockedNodes);
+                var spurDijkstra = graph.ShortestPathsDijkstra(spurWeight.GetWeight, spurNode);
+                if (!spurDijkstra(target, out var spurPath)) 
                     continue;
 
-                // Build full path (rootEdges + spurPath), cost, and signature in one pass
-                double cost = costRoot;
-                var sb = new StringBuilder();
-                // Root path signature: IDs of rootNodes
-                for (int idx = 0; idx < rootNodes.Count; idx++)
+                signature = new StringBuilder();
+                for (var index = 0; index < rootNodes.Count; index++)
                 {
-                    if (idx > 0) 
-                        sb.Append('>');
-                    sb.Append(rootNodes[idx].Id);
+                    if (index > 0) signature.Append('>');
+                    signature.Append(rootNodes[index].Id);
                 }
-
-                var nextNodes = new List<NetNode>(rootNodes.Count);
-                nextNodes.AddRange(rootNodes);
-
-                // Enumerate spurPath once to fill fullPath, cost, nextNodes, and signature
-                int edgeCounter = 0;
+                var cost = costRoot;
                 foreach (var edge in spurPath!)
                 {
                     fullPath.Add(edge);
                     cost += edge.Tag;
-
-                    sb.Append('>');
-                    sb.Append(edge.Target.Id);
-                    nextNodes.Add(edge.Target);
-
-                    edgeCounter++;
+                    signature.Append('>').Append(edge.Target.Id);
                 }
-
-                if (signatures.Add(sb.ToString()))
+                if (signatures.Add(signature.ToString())) 
                     candidates.Enqueue(fullPath, cost);
             }
 
-            // If no candidates, cannot find more paths
-            if (candidates.Count == 0)
-                break;
-
-            // Add the shortest candidate to result and keep its node sequence
+            if (candidates.Count == 0) break;
             var nextPath = candidates.Dequeue();
             result.Add(nextPath);
-
-            // Build nodes for the new path without re-walking the path
-            var nextNodesFromPath = nextPath.GetNodesFromPath().ToList();
-            resultNodes.Add(nextNodesFromPath);
+            resultNodes.Add(GetNodesFromPath(nextPath).ToList());
         }
-
         return result;
     }
-    
-    /// <summary>
-    /// Using the Nearest Neighbor heuristic finds path thru the must pass nodes
-    /// </summary>
-    /// <param name="graph">The graph representing nodes as <see cref="NetNode"/> and edges as <see cref="Link"/> with weights.</param>
-    /// <param name="source">The starting vertex for the "TSP tour".</param>
-    /// <returns>
-    /// A list containing a single path, which is a list of <see cref="Link"/> edges representing the tour through the graph.
-    /// The tour starts and ends at the <paramref name="source"/> node.
-    /// </returns>
-    /// <remarks>
-    /// The heuristic constructs a tour by repeatedly visiting the nearest unvisited neighbor node.
-    /// The resulting tour is returned as a sequence of edges (links) consistent with the graph representation.
-    /// </remarks>
-    public static List<Link> FindMustPassOpticPath(
-        this IVertexAndEdgeListGraph<NetNode, Link> graph,
+
+    private static List<Link> FindRequiredNodePath(
+        IVertexAndEdgeListGraph<NetNode, Link> graph,
         NetNode source,
-        NetNode target)
+        NetNode target,
+        RouteConstraints constraints,
+        CancellationToken cancellationToken)
     {
-        // Restrict to route-related nodes
-        var routeNodes = new HashSet<NetNode>(
-            graph.Vertices.Where(v => v.RoutingRole == RouteNodeType.InRoute));
-
-        var visited = new HashSet<NetNode> { source };
-        var nodes = new List<NetNode> { source };
+        var remaining = new HashSet<NetNode>(constraints.RequiredNodes);
+        remaining.Remove(source);
+        remaining.Remove(target);
         var current = source;
+        var route = new List<Link>();
 
-        // Build weights function for Dijkstra on Links
-        Func<Link, double> weight = e => e.CalculateLength();
-
-        // Precompute shortest paths from 'current' to all route nodes using Dijkstra to limit search space
-        var dijkstra = graph.ShortestPathsDijkstra(weight, current);
-
-        while (visited.Count < routeNodes.Count)
+        while (remaining.Count > 0)
         {
-            // Find nearest unvisited route node reachable from current
-            double? minDistance = null;
+            cancellationToken.ThrowIfCancellationRequested();
+            var weight = new RoutingWeight(constraints);
+            var dijkstra = graph.ShortestPathsDijkstra(weight.GetWeight, current);
+            double? bestDistance = null;
             NetNode? nearest = null;
-
-            foreach (var node in routeNodes)
+            List<Link>? nearestPath = null;
+            foreach (var node in remaining)
             {
-                if (visited.Contains(node))
+                if (!dijkstra(node, out var path)) 
                     continue;
 
-                if (dijkstra(node, out var path))
+                var candidatePath = path!.ToList();
+                var distance = candidatePath.Sum(weight.GetWeight);
+                if (bestDistance is null || distance < bestDistance)
                 {
-                    var dist = path.Sum(e => e.CalculateLength());
-                    if (minDistance == null || dist < minDistance)
-                    {
-                        minDistance = dist;
-                        nearest = node;
-                    }
+                    bestDistance = distance;
+                    nearest = node;
+                    nearestPath = candidatePath;
                 }
             }
+            if (nearest is null)
+                throw new NoPathFoundException($"A required node cannot be reached from {current} while avoiding the selected nodes.");
 
-            if (nearest == null)
-                break;
-
-            visited.Add(nearest);
-            nodes.Add(nearest);
+            route.AddRange(nearestPath!);
+            foreach (var visitedNode in GetNodesFromPath(nearestPath!))
+                remaining.Remove(visitedNode);
+            remaining.Remove(nearest);
             current = nearest;
-
-            dijkstra = graph.ShortestPathsDijkstra(weight, current);
         }
 
-        nodes.Add(target); // complete the loop
-
-        // Convert vertex path to edges by shortest paths between consecutive vertices:
-        var result = new List<Link>();
-        for (int i = 0; i < nodes.Count - 1; i++)
-        {
-            var from = nodes[i];
-            var to = nodes[i + 1];
-
-            if (!graph.ShortestPathsDijkstra(weight, from)(to, out var pathEdges))
-                throw new NoPathFoundException($"No path between {source}/{target}");
-
-            result.AddRange(pathEdges);
-        }
-
-        return result;
+        cancellationToken.ThrowIfCancellationRequested();
+        var finalWeight = new RoutingWeight(constraints);
+        if (!graph.ShortestPathsDijkstra(finalWeight.GetWeight, current)(target, out var finalPath))
+            throw new NoPathFoundException($"No path between {current}/{target} while visiting the required nodes.");
+        route.AddRange(finalPath!);
+        return route;
     }
 }

@@ -2,9 +2,9 @@ using System.Collections.Generic;
 using System.Linq;
 using OTN.Core;
 
-namespace OTN.Editor;
+namespace OTN.Wasm.ViewModels;
 
-public sealed record RouteResult(IReadOnlyList<Link> Links, double Length)
+public sealed record RouteViewModel(IReadOnlyList<Link> Links, double Length)
 {
     public string Description => Links.Count == 0
         ? "No links"
