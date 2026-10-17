@@ -35,3 +35,15 @@ ODU4 ─────────────────────────
 Routing algorithms such as Dijkstra's and Yen's address shortest-path problems in networks, with Yen's algorithm extending Dijkstra's to find k-shortest paths. They are old but effective.
 
 The [`NetNode`](/OTN/Core/NetNode.cs) represents a real location with typical DWDM equipment, and the [`Link`](/OTN/Core/Link.cs) represents an optical fiber span. Both layers (electrical `OtnNode`/`OtnSignal` and optical `NetNode`/`Link`) can be routed through as weighted (un)directed graphs.
+
+# OTN.Wasm
+
+A CAD-like application demo.
+
+Run it via docker (image size is somewhat ~20 Mb)
+
+```
+git clone https://github.com/dandriano/OTN.git
+docker build OTN -t otn
+docker run --rm -d -p 80:80 otn
+```
