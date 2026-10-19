@@ -23,6 +23,8 @@ public partial class NetworkCanvas : ComponentBase, IDisposable
     [Inject] private IJSRuntime JS { get; set; } = null!;
 
     private CanvasBase? _canvas;
+    private bool _isDirty = true;
+    private double _lastZoom = double.NaN;
     private EditorMode _mode = EditorMode.Select;
     private CreationMode _creationMode = CreationMode.Node;
     private NetNodeType _newNodeType = NetNodeType.Terminal;
@@ -37,9 +39,19 @@ public partial class NetworkCanvas : ComponentBase, IDisposable
 
     private void DocumentChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
+        _isDirty = true;
         if (e.PropertyName is nameof(NetworkEditorViewModel.Revision) or nameof(NetworkEditorViewModel.Routes) or nameof(NetworkEditorViewModel.SelectedRouteIndex))
             _highlightedLinks = Document.SelectedRouteIndex >= 0 ? Document.Routes[Document.SelectedRouteIndex].Links.ToHashSet() : [];
         _ = InvokeAsync(StateHasChanged);
+    }
+
+    protected override void OnParametersSet()
+    {
+        if (_lastZoom != Zoom)
+        {
+            _lastZoom = Zoom;
+            _isDirty = true;
+        }
     }
 
     public void Dispose() => Document.PropertyChanged -= DocumentChanged;
@@ -48,6 +60,7 @@ public partial class NetworkCanvas : ComponentBase, IDisposable
     {
         _panX = 0;
         _panY = 0;
+        _isDirty = true;
     }
 
     private NodeViewModel NodeFor(NetNode node) => Document.Nodes.First(item => ReferenceEquals(item.Node, node));
@@ -75,11 +88,15 @@ public partial class NetworkCanvas : ComponentBase, IDisposable
 
     private void SelectLink(LinkViewModel link) => Document.SelectLink(link);
 
-    private void CanvasReady(CanvasBase canvas) => _canvas = canvas;
+    private void CanvasReady(CanvasBase canvas)
+    {
+        _canvas = canvas;
+        _isDirty = true;
+    }
 
     private void DrawFrame(float timestamp)
     {
-        if (_canvas is null) 
+        if (_canvas is null || !_isDirty)
             return;
 
         var context = _canvas.RenderContext;
@@ -118,6 +135,7 @@ public partial class NetworkCanvas : ComponentBase, IDisposable
             context.FillStyle = "#92a0ae"; context.Font = "12px sans-serif"; context.FillText("Choose Edit → Node, then click anywhere on the canvas", 500, 348);
         }
         context.Restore();
+        _isDirty = false;
     }
 
     private void DrawLink(IRenderContext context, Link link)
@@ -268,6 +286,7 @@ public partial class NetworkCanvas : ComponentBase, IDisposable
     private async Task CanvasPointerDown(PointerEventArgs e)
     {
         var p = await Point(e); _pointerX = (p[0] - _panX) / Zoom; _pointerY = (p[1] - _panY) / Zoom;
+        _isDirty = true;
         if (e.Button != 0)
         {
             _panning = true; _panStartX = p[0]; _panStartY = p[1]; _panOriginX = _panX; _panOriginY = _panY;
@@ -307,15 +326,50 @@ public partial class NetworkCanvas : ComponentBase, IDisposable
 
     private async Task CanvasPointerMove(PointerEventArgs e)
     {
-        var p = await Point(e); _pointerX = (p[0] - _panX) / Zoom; _pointerY = (p[1] - _panY) / Zoom;
-        if (_dragNode is { } node) Document.MoveNode(node, _pointerX - _dragStartX, _pointerY - _dragStartY);
-        if (_panning) { _panX = _panOriginX + p[0] - _panStartX; _panY = _panOriginY + p[1] - _panStartY; }
+        var p = await Point(e);
+        var previousPointerX = _pointerX;
+        var previousPointerY = _pointerY;
         _pointerX = (p[0] - _panX) / Zoom; _pointerY = (p[1] - _panY) / Zoom;
-        _hoveredNode = FindNodeAtPointer();
+        if (_dragNode is { } node)
+        {
+            var nodeX = _pointerX - _dragStartX;
+            var nodeY = _pointerY - _dragStartY;
+            if (node.X != nodeX || node.Y != nodeY)
+                Document.MoveNode(node, nodeX, nodeY);
+        }
+        if (_panning)
+        {
+            var panX = _panOriginX + p[0] - _panStartX;
+            var panY = _panOriginY + p[1] - _panStartY;
+            if (_panX != panX || _panY != panY)
+            {
+                _panX = panX;
+                _panY = panY;
+                _isDirty = true;
+            }
+        }
+        _pointerX = (p[0] - _panX) / Zoom; _pointerY = (p[1] - _panY) / Zoom;
+        var hoveredNode = FindNodeAtPointer();
+        if (_hoveredNode != hoveredNode)
+        {
+            _hoveredNode = hoveredNode;
+            _isDirty = true;
+        }
+        if (Document.PendingLinkSource is not null &&
+            (previousPointerX != _pointerX || previousPointerY != _pointerY))
+            _isDirty = true;
     }
 
     private void CanvasPointerUp(PointerEventArgs e) { _dragNode = null; _panning = false; }
-    private void CanvasPointerLeave(PointerEventArgs e) { CanvasPointerUp(e); _hoveredNode = null; }
+    private void CanvasPointerLeave(PointerEventArgs e)
+    {
+        CanvasPointerUp(e);
+        if (_hoveredNode is not null)
+        {
+            _hoveredNode = null;
+            _isDirty = true;
+        }
+    }
 
     private NodeViewModel? FindNodeAtPointer() => Document.Nodes.LastOrDefault(item =>
         Math.Abs(item.X - _pointerX) <= 18 && Math.Abs(item.Y - _pointerY) <= 18);
