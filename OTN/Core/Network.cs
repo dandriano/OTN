@@ -53,14 +53,14 @@ public class Network
             throw new ArgumentOutOfRangeException(nameof(length), "Link weight must be a finite non-negative value.");
         if (!_optical.ContainsVertex(source) || !_optical.ContainsVertex(target))
             throw new ArgumentException("Both link endpoints must belong to this network.");
-        if (type is not LinkType.Directed and not LinkType.Undirected)
+        if (type is not LinkType.Simplex and not LinkType.Duplex)
             throw new ArgumentOutOfRangeException(nameof(type));
 
         var l = new Link(source, target, length, type);
         if (!_optical.AddEdge(l))
             throw new InvalidOperationException();
 
-        if (type == LinkType.Undirected)
+        if (type == LinkType.Duplex)
         {
             var reverse = new Link(l);
             if (!_optical.AddEdge(reverse))
@@ -79,7 +79,7 @@ public class Network
         ArgumentNullException.ThrowIfNull(link);
         if (!double.IsFinite(length) || length < 0)
             throw new ArgumentOutOfRangeException(nameof(length), "Link weight must be a finite non-negative value.");
-        if (type is not LinkType.Directed and not LinkType.Undirected)
+        if (type is not LinkType.Simplex and not LinkType.Duplex)
             throw new ArgumentOutOfRangeException(nameof(type));
         if (!Contains(link))
             throw new ArgumentException("The link is not part of this network.", nameof(link));

@@ -2,10 +2,10 @@
     <div class="section-heading">
         <div>
             <span class="eyebrow">PROPERTIES</span>
-            <h2><button type="button" class="section-toggle" aria-expanded="@(!_collapsed)" aria-controls="inspector-content" @onclick="ToggleCollapsed">Inspector<span class="section-chevron" aria-hidden="true">⌄</span></button></h2>
+            <h2><button type="button" class="section-toggle" aria-expanded="@IsExpanded" aria-controls="inspector-content" @onclick="ToggleExpanded">Inspector<span class="section-chevron" aria-hidden="true">⌄</span></button></h2>
         </div>
     </div>
-    <div id="inspector-content" hidden="@_collapsed">
+    <div id="inspector-content" hidden="@(!IsExpanded)">
         @if (Document.SelectedNode is { } selectedNode)
         {
             <div class="selected-kind"><span class="kind-icon @NodeClass(selectedNode.Node.Type)"><EditorObjectIcon NodeType="selectedNode.Node.Type" /></span><div><strong>Network node</strong><small>@selectedNode.Node.Id</small></div></div>
@@ -16,7 +16,7 @@
         {
             <div class="selected-kind"><span class="kind-icon link-kind"><EditorObjectIcon LinkDirection="selectedLink.Link.LinkType" /></span><div><strong>Optical link</strong><small>@selectedLink.Link.Id</small></div></div>
             <label class="field-label">Length (km)</label><input class="field" type="number" min="0" step="0.1" @bind="_linkWeight" />
-            <label class="field-label">Direction</label><select class="field" @bind="_linkDirection"><option value="Directed">Directed</option><option value="Undirected">Undirected</option></select>
+            <label class="field-label">Link mode</label><select class="field" @bind="_linkMode"><option value="Simplex">Simplex</option><option value="Duplex">Duplex</option></select>
             <button class="primary-button full-width" @onclick="() => UpdateSelectedLink(selectedLink)">Apply changes</button>
         }
         else { <div class="inspector-empty"><span>⌖</span><p>Select a node or link to inspect its properties.</p></div> }
@@ -25,13 +25,13 @@
 
 @code {
     [Parameter, EditorRequired] public NetworkEditorViewModel Document { get; set; } = null!;
+    [Parameter] public bool IsExpanded { get; set; }
+    [Parameter] public EventCallback<bool> ExpandedChanged { get; set; }
 
     private LinkViewModel? _inspectedLink;
     private string _linkWeight = "100";
-    private LinkType _linkDirection = LinkType.Undirected;
-    private bool _collapsed;
-
-    private void ToggleCollapsed() => _collapsed = !_collapsed;
+    private LinkType _linkMode = LinkType.Duplex;
+    private Task ToggleExpanded() => ExpandedChanged.InvokeAsync(!IsExpanded);
 
     protected override void OnParametersSet()
     {
@@ -41,18 +41,23 @@
             _inspectedLink = null;
             return;
         }
-        if (ReferenceEquals(selectedLink, _inspectedLink)) return;
+        if (ReferenceEquals(selectedLink, _inspectedLink)) 
+            return;
 
         _inspectedLink = selectedLink;
         _linkWeight = selectedLink.Link.Tag.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
-        _linkDirection = selectedLink.Link.LinkType;
+        _linkMode = selectedLink.Link.LinkType;
     }
 
     private static string NodeClass(NetNodeType type) => type.ToString().ToLowerInvariant();
-    private void ChangeNodeType(NodeViewModel node, string? value) { if (Enum.TryParse<NetNodeType>(value, out var type)) Document.SetNodeType(node, type); }
+    private void ChangeNodeType(NodeViewModel node, string? value) 
+    { 
+        if (Enum.TryParse<NetNodeType>(value, out var type)) 
+            Document.SetNodeType(node, type); 
+    }
     private void UpdateSelectedLink(LinkViewModel link)
     {
         if (double.TryParse(_linkWeight, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var weight))
-            Document.UpdateLink(link, weight, _linkDirection);
+            Document.UpdateLink(link, weight, _linkMode);
     }
 }

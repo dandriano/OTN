@@ -28,7 +28,7 @@ public partial class NetworkCanvas : ComponentBase, IDisposable
     private EditorMode _mode = EditorMode.Select;
     private CreationMode _creationMode = CreationMode.Node;
     private NetNodeType _newNodeType = NetNodeType.Terminal;
-    private LinkType _newLinkType = LinkType.Undirected;
+    private LinkType _newLinkType = LinkType.Duplex;
     private double _panX, _panY, _pointerX, _pointerY, _dragStartX, _dragStartY, _panStartX, _panStartY, _panOriginX, _panOriginY;
     private NodeViewModel? _dragNode;
     private NodeViewModel? _hoveredNode;
@@ -165,7 +165,7 @@ public partial class NetworkCanvas : ComponentBase, IDisposable
                 if (visibleLength >= 20)
                 {
                     DrawArrow(context, endX, endY, dx, dy, stroke, lineWidth);
-                    if (link.LinkType == LinkType.Undirected)
+                    if (link.LinkType == LinkType.Duplex)
                         DrawArrow(context, startX, startY, -dx, -dy, stroke, lineWidth);
                 }
             }
@@ -186,8 +186,8 @@ public partial class NetworkCanvas : ComponentBase, IDisposable
 
     private void DrawNode(IRenderContext context, NodeViewModel item)
     {
-        var required = Document.IsRequiredRouteNode(item);
-        var avoided = Document.IsAvoidedRouteNode(item);
+        var required = Document.IsMustNode(item);
+        var avoided = Document.IsAvoidNode(item);
         var fill = required ? "#238653" : avoided ? "#c94f4f" : _hoveredNode == item ? "#FFD700" : "#607D8B";
 
         context.Save();
@@ -309,8 +309,8 @@ public partial class NetworkCanvas : ComponentBase, IDisposable
             }
             if (_mode == EditorMode.Select)
             {
-                if (e.ShiftKey) { Document.ToggleRequiredRouteNode(hitNode); return; }
-                if (e.AltKey) { Document.ToggleAvoidedRouteNode(hitNode); return; }
+                if (e.ShiftKey) { Document.ToggleMustNode(hitNode); return; }
+                if (e.AltKey) { Document.ToggleAvoidNode(hitNode); return; }
                 Document.SelectNode(hitNode); _dragNode = hitNode;
                 _dragStartX = _pointerX - hitNode.X; _dragStartY = _pointerY - hitNode.Y;
             }

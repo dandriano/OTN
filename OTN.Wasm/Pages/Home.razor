@@ -11,20 +11,43 @@
     <div class="workspace">
         <NetworkCanvas @ref="_networkCanvas" Document="Document" Zoom="_zoom" ZoomChanged="SetZoom" />
         <aside class="side-panel">
-            <PropertiesInspector Document="Document" />
-            <RouteFinder Document="Document" />
+            <PropertiesInspector Document="Document" IsExpanded="@(_expandedSection == SidebarSection.Inspector)" ExpandedChanged="SetInspectorExpanded" />
+            <RouteFinder Document="Document" IsExpanded="@(_expandedSection == SidebarSection.RouteFinder)" ExpandedChanged="SetRouteFinderExpanded" />
         </aside>
     </div>
 </main>
 
 @code {
+    private enum SidebarSection { Inspector, RouteFinder }
+
     private double _zoom = 1;
     private NetworkCanvas? _networkCanvas;
+    private SidebarSection? _expandedSection = SidebarSection.Inspector;
 
     protected override void OnInitialized() => Document.PropertyChanged += DocumentChanged;
 
     private void DocumentChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e) =>
         _ = InvokeAsync(StateHasChanged);
+
+    private Task SetInspectorExpanded(bool expanded)
+    {
+        if (expanded)
+            _expandedSection = SidebarSection.Inspector;
+        else if (_expandedSection == SidebarSection.Inspector)
+            _expandedSection = null;
+
+        return Task.CompletedTask;
+    }
+
+    private Task SetRouteFinderExpanded(bool expanded)
+    {
+        if (expanded)
+            _expandedSection = SidebarSection.RouteFinder;
+        else if (_expandedSection == SidebarSection.RouteFinder)
+            _expandedSection = null;
+
+        return Task.CompletedTask;
+    }
 
     public void Dispose() => Document.PropertyChanged -= DocumentChanged;
 

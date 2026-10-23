@@ -2,6 +2,6 @@ namespace OTN.Enums;
 
 public enum LinkType
 {
-    Directed,
-    Undirected
+    Simplex = 0,
+    Duplex = 1
 }

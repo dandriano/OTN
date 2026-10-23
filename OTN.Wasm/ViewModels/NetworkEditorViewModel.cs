@@ -10,13 +10,14 @@ using QuikGraph;
 
 namespace OTN.Wasm.ViewModels;
 
-/// <summary>UI-independent commands and state for editing and routing an optical graph.</summary>
 public sealed class NetworkEditorViewModel : ObservableObject
 {
     private readonly List<NodeViewModel> _nodes = [];
     private readonly List<LinkViewModel> _links = [];
-    private readonly HashSet<NodeViewModel> _requiredRouteNodes = [];
-    private readonly HashSet<NodeViewModel> _avoidedRouteNodes = [];
+    private readonly HashSet<NodeViewModel> _mustNodes = [];
+    private readonly HashSet<NodeViewModel> _avoidNodes = [];
+    private NodeViewModel? _sourceNode;
+    private NodeViewModel? _targetNode;
     private NodeViewModel? _selectedNode;
     private LinkViewModel? _selectedLink;
     private NodeViewModel? _pendingLinkSource;
@@ -31,8 +32,17 @@ public sealed class NetworkEditorViewModel : ObservableObject
     public IRelayCommand<int> SelectRouteCommand { get; }
     public IReadOnlyList<NodeViewModel> Nodes => _nodes;
     public IReadOnlyList<LinkViewModel> Links => _links;
-    public IReadOnlyCollection<NodeViewModel> RequiredRouteNodes => _requiredRouteNodes;
-    public IReadOnlyCollection<NodeViewModel> AvoidedRouteNodes => _avoidedRouteNodes;
+    public IReadOnlyCollection<NodeViewModel> RequiredRouteNodes => _mustNodes;
+    public IReadOnlyCollection<NodeViewModel> AvoidedRouteNodes => _avoidNodes;
+    public NodeViewModel? SourceRouteNode { get => _sourceNode; private set => SetProperty(ref _sourceNode, value); }
+    public NodeViewModel? TargetRouteNode { get => _targetNode; private set => SetProperty(ref _targetNode, value); }
+    public IEnumerable<NodeViewModel> SourceRouteNodeOptions => _nodes.Where(node =>
+        ReferenceEquals(node, SourceRouteNode) ||
+        !ReferenceEquals(node, TargetRouteNode) && !IsRouteConstraintNode(node));
+    public IEnumerable<NodeViewModel> TargetRouteNodeOptions => _nodes.Where(node =>
+        ReferenceEquals(node, TargetRouteNode) ||
+        !ReferenceEquals(node, SourceRouteNode) && !IsRouteConstraintNode(node));
+    public IEnumerable<NodeViewModel> RouteConstraintNodeOptions => _nodes.Where(node => !IsEndpoint(node));
     public NodeViewModel? SelectedNode { get => _selectedNode; private set => SetProperty(ref _selectedNode, value); }
     public LinkViewModel? SelectedLink { get => _selectedLink; private set => SetProperty(ref _selectedLink, value); }
     public NodeViewModel? PendingLinkSource { get => _pendingLinkSource; private set => SetProperty(ref _pendingLinkSource, value); }
@@ -83,41 +93,72 @@ public sealed class NetworkEditorViewModel : ObservableObject
         OnPropertyChanged(nameof(Nodes));
     }
 
-    public bool IsRequiredRouteNode(NodeViewModel node) => _requiredRouteNodes.Contains(node);
-    public bool IsAvoidedRouteNode(NodeViewModel node) => _avoidedRouteNodes.Contains(node);
+    public bool IsMustNode(NodeViewModel node) => _mustNodes.Contains(node);
+    public bool IsAvoidNode(NodeViewModel node) => _avoidNodes.Contains(node);
+    public bool IsEndpoint(NodeViewModel node) => ReferenceEquals(node, SourceRouteNode) || ReferenceEquals(node, TargetRouteNode);
 
-    public void SetRequiredRouteNode(NodeViewModel node, bool required)
+    public bool SetSourceRouteNode(NodeViewModel? node)
+    {
+        if (node is not null)
+        {
+            EnsureNode(node);
+            if (ReferenceEquals(node, TargetRouteNode) || IsRouteConstraintNode(node))
+                return false;
+        }
+        if (ReferenceEquals(SourceRouteNode, node))
+            return true;
+
+        SourceRouteNode = node;
+        RouteEndpointsChanged();
+        return true;
+    }
+
+    public bool SetTargetNode(NodeViewModel? node)
+    {
+        if (node is not null)
+        {
+            EnsureNode(node);
+            if (ReferenceEquals(node, SourceRouteNode) || IsRouteConstraintNode(node))
+                return false;
+        }
+        if (ReferenceEquals(TargetRouteNode, node))
+            return true;
+
+        TargetRouteNode = node;
+        RouteEndpointsChanged();
+        return true;
+    }
+
+    public void SetMustNode(NodeViewModel node, bool required)
     {
         EnsureNode(node);
-        var changed = required ? _requiredRouteNodes.Add(node) : _requiredRouteNodes.Remove(node);
+        if (required && IsEndpoint(node))
+            return;
+        var changed = required ? _mustNodes.Add(node) : _mustNodes.Remove(node);
         if (!changed) 
             return;
         if (required)
-            _avoidedRouteNodes.Remove(node);
+            _avoidNodes.Remove(node);
         RouteConstraintsChanged();
     }
 
-    public void SetAvoidedRouteNode(NodeViewModel node, bool avoided)
+    public void SetAvoidNode(NodeViewModel node, bool avoided)
     {
         EnsureNode(node);
-        var changed = avoided ? _avoidedRouteNodes.Add(node) : _avoidedRouteNodes.Remove(node);
+        if (avoided && IsEndpoint(node))
+            return;
+        var changed = avoided ? _avoidNodes.Add(node) : _avoidNodes.Remove(node);
         if (!changed) 
             return;
         if (avoided)
-            _requiredRouteNodes.Remove(node);
+            _mustNodes.Remove(node);
         RouteConstraintsChanged();
     }
 
-    public void ToggleRequiredRouteNode(NodeViewModel node) => SetRequiredRouteNode(node, !IsRequiredRouteNode(node));
-    public void ToggleAvoidedRouteNode(NodeViewModel node) => SetAvoidedRouteNode(node, !IsAvoidedRouteNode(node));
-
-    public void ToggleRouteConstraint(NodeViewModel node, bool required)
-    {
-        if (required) 
-            ToggleRequiredRouteNode(node);
-        else 
-            ToggleAvoidedRouteNode(node);
-    }
+    public void ToggleMustNode(NodeViewModel node) 
+        => SetMustNode(node, !IsMustNode(node));
+    public void ToggleAvoidNode(NodeViewModel node) 
+        => SetAvoidNode(node, !IsAvoidNode(node));
 
     public void BeginLink(NodeViewModel source)
     {
@@ -125,7 +166,8 @@ public sealed class NetworkEditorViewModel : ObservableObject
             PendingLinkSource = source;
     }
 
-    public void CancelPendingLink() => PendingLinkSource = null;
+    public void CancelPendingLink() 
+        => PendingLinkSource = null;
 
     public bool CompleteLink(NodeViewModel target, double weight, LinkType type)
     {
@@ -181,7 +223,7 @@ public sealed class NetworkEditorViewModel : ObservableObject
         SelectedRouteIndex = index >= 0 && index < Routes.Count ? index : -1;
     }
 
-    public void FindOpticRoutes(Guid sourceId, Guid targetId, int k)
+    public void FindRoutes(Guid sourceId, Guid targetId, int k)
     {
         ExecuteRouteSearch(() => Network.Optical.FindOpticPath(FindNode(sourceId), FindNode(targetId), RouteConstraints, k)
             .Select(path => new RouteViewModel(path, path.Sum(link => link.Tag))).ToArray());
@@ -240,11 +282,25 @@ public sealed class NetworkEditorViewModel : ObservableObject
         OnPropertyChanged(nameof(RequiredRouteNodes));
         OnPropertyChanged(nameof(AvoidedRouteNodes));
         OnPropertyChanged(nameof(RouteConstraints));
+        OnPropertyChanged(nameof(SourceRouteNodeOptions));
+        OnPropertyChanged(nameof(TargetRouteNodeOptions));
+        OnPropertyChanged(nameof(RouteConstraintNodeOptions));
+    }
+
+    private bool IsRouteConstraintNode(NodeViewModel node) =>
+        _mustNodes.Contains(node) || _avoidNodes.Contains(node);
+
+    private void RouteEndpointsChanged()
+    {
+        ClearRoutes();
+        OnPropertyChanged(nameof(SourceRouteNodeOptions));
+        OnPropertyChanged(nameof(TargetRouteNodeOptions));
+        OnPropertyChanged(nameof(RouteConstraintNodeOptions));
     }
 
     public RouteConstraints RouteConstraints => new(
-        _requiredRouteNodes.Select(node => node.Node),
-        _avoidedRouteNodes.Select(node => node.Node));
+        _mustNodes.Select(node => node.Node),
+        _avoidNodes.Select(node => node.Node));
 
     private void ClearRoutes()
     {

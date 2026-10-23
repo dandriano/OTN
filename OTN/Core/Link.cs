@@ -14,25 +14,25 @@ public class Link : EquatableTaggedEdge<NetNode, double>, IEdge<NetNode>, ILink
     public LinkType LinkType { get; private set; }
     public Link? Reverse { get; private set; }
 
-    public Link(NetNode source, NetNode target, double weight, LinkType linkType = LinkType.Undirected)
+    public Link(NetNode source, NetNode target, double weight, LinkType linkType = LinkType.Duplex)
         : base(source, target, weight)
     {
         LinkType = linkType;
     }
 
     /// <summary>
-    /// Constructs the reverse link for an existing undirected link and cross-wires their Reverse properties.
+    /// Constructs the reverse link for an existing duplex link and cross-wires their Reverse properties.
     /// </summary>
     public Link(Link reverse) : base(reverse.Target, reverse.Source, reverse.Tag)
     {
-        if (reverse.LinkType != LinkType.Undirected)
-            throw new ArgumentException("Cannot create a reverse link for a directed link.", nameof(reverse));
+        if (reverse.LinkType != LinkType.Duplex)
+            throw new ArgumentException("Cannot create a reverse link for a simplex link.", nameof(reverse));
 
         if (reverse.Reverse is not null)
             throw new InvalidOperationException("Link already has a reverse link assigned.");
 
         Reverse = reverse;
         reverse.Reverse = this;
-        LinkType = LinkType.Undirected;
+        LinkType = LinkType.Duplex;
     }
 }

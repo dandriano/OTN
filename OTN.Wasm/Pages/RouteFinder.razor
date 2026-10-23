@@ -4,25 +4,64 @@
     <div class="section-heading">
         <div>
             <span class="eyebrow">PATH ANALYSIS</span>
-            <h2><button type="button" class="section-toggle" aria-expanded="@(!_collapsed)" aria-controls="route-finder-content" @onclick="ToggleCollapsed">Route finder<span class="section-chevron" aria-hidden="true">⌄</span></button></h2>
+            <h2><button type="button" class="section-toggle" aria-expanded="@IsExpanded" aria-controls="route-finder-content" @onclick="ToggleExpanded">Route finder<span class="section-chevron" aria-hidden="true">⌄</span></button></h2>
         </div>
     </div>
-    <div id="route-finder-content" hidden="@_collapsed">
-        <label class="field-label">Source</label><select class="field" @bind="_sourceId"><option value="">Select source</option>@foreach (var item in Document.Nodes) { <option value="@item.Node.Id">@NodeOption(item)</option> }</select>
-        <label class="field-label">Target</label><select class="field" @bind="_targetId"><option value="">Select target</option>@foreach (var item in Document.Nodes) { <option value="@item.Node.Id">@NodeOption(item)</option> }</select>
+    <div id="route-finder-content" hidden="@(!IsExpanded)">
+        <label class="field-label">Source</label><select class="field" value="@Document.SourceRouteNode?.Node.Id.ToString()" @onchange="SetSourceRouteNode"><option value="">Select source</option>@foreach (var item in Document.SourceRouteNodeOptions) { <option value="@item.Node.Id">@NodeOption(item)</option> }</select>
+        <label class="field-label">Target</label><select class="field" value="@Document.TargetRouteNode?.Node.Id.ToString()" @onchange="SetTargetRouteNode"><option value="">Select target</option>@foreach (var item in Document.TargetRouteNodeOptions) { <option value="@item.Node.Id">@NodeOption(item)</option> }</select>
         <div class="constraint-group">
-            <label class="field-label">Required nodes</label>
-            @if (Document.Nodes.Count == 0) { <small>Add nodes to set route constraints.</small> }
-            @foreach (var item in Document.Nodes)
+            <label class="field-label" for="route-node-search">Add constraints</label>
+            <input id="route-node-search" class="field node-search" type="search" value="@_nodeSearch" @oninput="UpdateNodeSearch" placeholder="Search node type or full ID" />
+            @if (string.IsNullOrWhiteSpace(_nodeSearch))
             {
-                <label class="constraint-option" @key="item.Node.Id"><input type="checkbox" checked="@Document.IsRequiredRouteNode(item)" @onchange="e => Document.SetRequiredRouteNode(item, e.Value is true)" />@NodeOption(item)</label>
+                <small>Search to add a must or avoid node.</small>
+            }
+            else
+            {
+                <div class="node-search-results" aria-label="Matching nodes">
+                    <Virtualize Items="_matchingNodes" Context="item" ItemSize="42">
+                        <ItemContent>
+                            <div class="node-search-result" @key="item.Node.Id">
+                                <span class="constraint-node-label"><strong>@item.Node.Type</strong><small>@item.Node.Id</small></span>
+                                <select class="constraint-select" aria-label="Constraint for @NodeOption(item)" value="@NodeConstraint(item)" @onchange="e => SetNodeConstraint(item, e.Value?.ToString())">
+                                    <option value="none">None</option>
+                                    <option value="must">Must</option>
+                                    <option value="avoid">Avoid</option>
+                                </select>
+                            </div>
+                        </ItemContent>
+                        <EmptyContent>
+                            <div class="node-search-empty">No matching nodes.</div>
+                        </EmptyContent>
+                    </Virtualize>
+                </div>
             }
         </div>
-        <div class="constraint-group">
-            <label class="field-label">Avoided nodes</label>
-            @foreach (var item in Document.Nodes)
+        <div class="active-constraints">
+            <label class="field-label">Active constraints</label>
+            @if (Document.RequiredRouteNodes.Count + Document.AvoidedRouteNodes.Count == 0)
             {
-                <label class="constraint-option" @key="item.Node.Id"><input type="checkbox" checked="@Document.IsAvoidedRouteNode(item)" @onchange="e => Document.SetAvoidedRouteNode(item, e.Value is true)" />@NodeOption(item)</label>
+                <small>No route constraints set.</small>
+            }
+            else
+            {
+                <div class="active-constraint-list">
+                    @foreach (var item in Document.RequiredRouteNodes)
+                    {
+                        <div class="active-constraint required" @key="item.Node.Id">
+                            <span class="constraint-kind">Must</span><span class="active-constraint-node" title="@item.Node.Id">@NodeOptionFull(item)</span>
+                            <button type="button" aria-label="Clear required constraint for @NodeOption(item)" title="Clear constraint" @onclick="() => Document.SetMustNode(item, false)">×</button>
+                        </div>
+                    }
+                    @foreach (var item in Document.AvoidedRouteNodes)
+                    {
+                        <div class="active-constraint avoided" @key="item.Node.Id">
+                            <span class="constraint-kind">Avoid</span><span class="active-constraint-node" title="@item.Node.Id">@NodeOptionFull(item)</span>
+                            <button type="button" aria-label="Clear avoided constraint for @NodeOption(item)" title="Clear constraint" @onclick="() => Document.SetAvoidNode(item, false)">×</button>
+                        </div>
+                    }
+                </div>
             }
         </div>
         <div class="route-controls"><label><span>K shortest</span><input type="number" min="1" max="20" @bind="_routeCount" disabled="@(Document.RequiredRouteNodes.Count > 0)" /></label><button class="primary-button" disabled="@Document.IsRouting" @onclick="RunSearch">Find route(s)</button></div>
@@ -45,13 +84,15 @@
 
 @code {
     [Parameter, EditorRequired] public NetworkEditorViewModel Document { get; set; } = null!;
+    [Parameter] public bool IsExpanded { get; set; }
+    [Parameter] public EventCallback<bool> ExpandedChanged { get; set; }
 
-    private string _sourceId = "", _targetId = "";
     private int _routeCount = 3;
-    private bool _collapsed;
+    private string _nodeSearch = "";
+    private List<NodeViewModel> _matchingNodes = [];
     private NetworkEditorViewModel? _subscribedDocument;
 
-    private void ToggleCollapsed() => _collapsed = !_collapsed;
+    private Task ToggleExpanded() => ExpandedChanged.InvokeAsync(!IsExpanded);
 
     protected override void OnParametersSet()
     {
@@ -59,10 +100,19 @@
         if (_subscribedDocument is not null) _subscribedDocument.PropertyChanged -= DocumentChanged;
         _subscribedDocument = Document;
         _subscribedDocument.PropertyChanged += DocumentChanged;
+        RefreshMatchingNodes();
     }
 
     private void DocumentChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e) =>
-        _ = InvokeAsync(StateHasChanged);
+        _ = InvokeAsync(() =>
+        {
+            if (e.PropertyName is nameof(NetworkEditorViewModel.Nodes)
+                or nameof(NetworkEditorViewModel.SourceRouteNode)
+                or nameof(NetworkEditorViewModel.TargetRouteNode)
+                or nameof(NetworkEditorViewModel.RouteConstraintNodeOptions))
+                RefreshMatchingNodes();
+            StateHasChanged();
+        });
 
     public void Dispose()
     {
@@ -70,13 +120,61 @@
     }
 
     private static string NodeOption(NodeViewModel item) => string.Concat(item.Node.Type, " · ", item.Node.Id.ToString()[..5]);
+    private static string NodeOptionFull(NodeViewModel item) => string.Concat(item.Node.Type, " · ", item.Node.Id);
+
+    private void UpdateNodeSearch(ChangeEventArgs e)
+    {
+        _nodeSearch = e.Value?.ToString() ?? "";
+        RefreshMatchingNodes();
+    }
+
+    private void RefreshMatchingNodes()
+    {
+        var query = _nodeSearch.Trim();
+        _matchingNodes = query.Length == 0
+            ? []
+            : Document.RouteConstraintNodeOptions.Where(item =>
+                item.Node.Type.ToString().Contains(query, StringComparison.OrdinalIgnoreCase)
+                || item.Node.Id.ToString().Contains(query, StringComparison.OrdinalIgnoreCase)).ToList();
+    }
+
+    private void SetSourceRouteNode(ChangeEventArgs e) =>
+        Document.SetSourceRouteNode(FindNode(e.Value?.ToString()));
+
+    private void SetTargetRouteNode(ChangeEventArgs e) =>
+        Document.SetTargetNode(FindNode(e.Value?.ToString()));
+
+    private NodeViewModel? FindNode(string? id) => Guid.TryParse(id, out var nodeId)
+        ? Document.Nodes.FirstOrDefault(item => item.Node.Id == nodeId)
+        : null;
+
+    private string NodeConstraint(NodeViewModel item) => Document.IsMustNode(item)
+        ? "must"
+        : Document.IsAvoidNode(item) ? "avoid" : "none";
+
+    private void SetNodeConstraint(NodeViewModel item, string? constraint)
+    {
+        switch (constraint)
+        {
+            case "must":
+                Document.SetMustNode(item, true);
+                break;
+            case "avoid":
+                Document.SetAvoidNode(item, true);
+                break;
+            default:
+                Document.SetMustNode(item, false);
+                Document.SetAvoidNode(item, false);
+                break;
+        }
+    }
 
     private async Task RunSearch()
     {
-        if (!Guid.TryParse(_sourceId, out var source) || !Guid.TryParse(_targetId, out var target)) return;
+        if (Document.SourceRouteNode is not { } source || Document.TargetRouteNode is not { } target) return;
         Document.PrepareRouteSearch();
         StateHasChanged();
         await Task.Delay(30);
-        Document.FindOpticRoutes(source, target, Math.Clamp(_routeCount, 1, 20));
+        Document.FindRoutes(source.Node.Id, target.Node.Id, Math.Clamp(_routeCount, 1, 20));
     }
 }

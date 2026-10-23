@@ -21,9 +21,9 @@
             }
             else
             {
-                <div class="tool-group choice-group" role="group" aria-label="Link direction">
-                    <button type="button" class="tool-button choice-button @ActiveLinkType(LinkType.Undirected)" aria-label="Undirected" aria-pressed="@(_newLinkType == LinkType.Undirected)" title="Undirected" @onclick="() => SetNewLinkType(LinkType.Undirected)"><EditorObjectIcon LinkDirection="LinkType.Undirected" /><span class="choice-label">Undirected</span></button>
-                    <button type="button" class="tool-button choice-button @ActiveLinkType(LinkType.Directed)" aria-label="Directed" aria-pressed="@(_newLinkType == LinkType.Directed)" title="Directed" @onclick="() => SetNewLinkType(LinkType.Directed)"><EditorObjectIcon LinkDirection="LinkType.Directed" /><span class="choice-label">Directed</span></button>
+                <div class="tool-group choice-group" role="group" aria-label="Link mode">
+                    <button type="button" class="tool-button choice-button @ActiveLinkType(LinkType.Duplex)" aria-label="Duplex" aria-pressed="@(_newLinkType == LinkType.Duplex)" title="Duplex" @onclick="() => SetNewLinkType(LinkType.Duplex)"><EditorObjectIcon LinkDirection="LinkType.Duplex" /><span class="choice-label">Duplex</span></button>
+                    <button type="button" class="tool-button choice-button @ActiveLinkType(LinkType.Simplex)" aria-label="Simplex" aria-pressed="@(_newLinkType == LinkType.Simplex)" title="Simplex" @onclick="() => SetNewLinkType(LinkType.Simplex)"><EditorObjectIcon LinkDirection="LinkType.Simplex" /><span class="choice-label">Simplex</span></button>
                 </div>
                 <span class="mode-hint">@(Document.PendingLinkSource is null ? "Select a source node" : "Select a target node · Escape to cancel")</span>
             }
