@@ -1,98 +1,143 @@
 @implements IDisposable
 
-<section class="panel-section routing-section">
-    <div class="section-heading">
-        <div>
-            <span class="eyebrow">PATH ANALYSIS</span>
-            <h2><button type="button" class="section-toggle" aria-expanded="@IsExpanded" aria-controls="route-finder-content" @onclick="ToggleExpanded">Route finder<span class="section-chevron" aria-hidden="true">⌄</span></button></h2>
-        </div>
+<div class="space-y-4">
+    <div>
+        <label class="mb-2 block text-sm font-medium">
+            Source
+            <BbCombobox TValue="string" Options="@_sourceNodeOptions" Value="@(Document.SourceRouteNode?.Node.Id.ToString() ?? string.Empty)" ValueChanged="SetSourceRouteNode" Placeholder="Select source" SearchPlaceholder="Search node type or ID" EmptyMessage="No eligible source nodes." MatchTriggerWidth="true" Class="mt-2 w-full" />
+        </label>
     </div>
-    <div id="route-finder-content" hidden="@(!IsExpanded)">
-        <label class="field-label">Source</label><select class="field" value="@Document.SourceRouteNode?.Node.Id.ToString()" @onchange="SetSourceRouteNode"><option value="">Select source</option>@foreach (var item in Document.SourceRouteNodeOptions) { <option value="@item.Node.Id">@NodeOption(item)</option> }</select>
-        <label class="field-label">Target</label><select class="field" value="@Document.TargetRouteNode?.Node.Id.ToString()" @onchange="SetTargetRouteNode"><option value="">Select target</option>@foreach (var item in Document.TargetRouteNodeOptions) { <option value="@item.Node.Id">@NodeOption(item)</option> }</select>
-        <div class="constraint-group">
-            <label class="field-label" for="route-node-search">Add constraints</label>
-            <input id="route-node-search" class="field node-search" type="search" value="@_nodeSearch" @oninput="UpdateNodeSearch" placeholder="Search node type or full ID" />
-            @if (string.IsNullOrWhiteSpace(_nodeSearch))
-            {
-                <small>Search to add a must or avoid node.</small>
-            }
-            else
-            {
-                <div class="node-search-results" aria-label="Matching nodes">
-                    <Virtualize Items="_matchingNodes" Context="item" ItemSize="42">
-                        <ItemContent>
-                            <div class="node-search-result" @key="item.Node.Id">
-                                <span class="constraint-node-label"><strong>@item.Node.Type</strong><small>@item.Node.Id</small></span>
-                                <select class="constraint-select" aria-label="Constraint for @NodeOption(item)" value="@NodeConstraint(item)" @onchange="e => SetNodeConstraint(item, e.Value?.ToString())">
-                                    <option value="none">None</option>
-                                    <option value="must">Must</option>
-                                    <option value="avoid">Avoid</option>
-                                </select>
-                            </div>
-                        </ItemContent>
-                        <EmptyContent>
-                            <div class="node-search-empty">No matching nodes.</div>
-                        </EmptyContent>
-                    </Virtualize>
-                </div>
-            }
-        </div>
-        <div class="active-constraints">
-            <label class="field-label">Active constraints</label>
-            @if (Document.RequiredRouteNodes.Count + Document.AvoidedRouteNodes.Count == 0)
-            {
-                <small>No route constraints set.</small>
-            }
-            else
-            {
-                <div class="active-constraint-list">
-                    @foreach (var item in Document.RequiredRouteNodes)
-                    {
-                        <div class="active-constraint required" @key="item.Node.Id">
-                            <span class="constraint-kind">Must</span><span class="active-constraint-node" title="@item.Node.Id">@NodeOptionFull(item)</span>
-                            <button type="button" aria-label="Clear required constraint for @NodeOption(item)" title="Clear constraint" @onclick="() => Document.SetMustNode(item, false)">×</button>
-                        </div>
-                    }
-                    @foreach (var item in Document.AvoidedRouteNodes)
-                    {
-                        <div class="active-constraint avoided" @key="item.Node.Id">
-                            <span class="constraint-kind">Avoid</span><span class="active-constraint-node" title="@item.Node.Id">@NodeOptionFull(item)</span>
-                            <button type="button" aria-label="Clear avoided constraint for @NodeOption(item)" title="Clear constraint" @onclick="() => Document.SetAvoidNode(item, false)">×</button>
-                        </div>
-                    }
-                </div>
-            }
-        </div>
-        <div class="route-controls"><label><span>K shortest</span><input type="number" min="1" max="20" @bind="_routeCount" disabled="@(Document.RequiredRouteNodes.Count > 0)" /></label><button class="primary-button" disabled="@Document.IsRouting" @onclick="RunSearch">Find route(s)</button></div>
-        @if (Document.RequiredRouteNodes.Count > 0) { <small class="constraint-note">Required nodes are visited in nearest-first order. K is inactive.</small> }
-        @if (Document.IsRouting) { <div class="route-status"><span class="spinner"></span>Searching routes…</div> }
-        @if (Document.RouteError is { } error) { <div class="error-message"><strong>Route search failed</strong><span>@error</span></div> }
-        @if (Document.Routes.Count > 0)
+    <div>
+        <label class="mb-2 block text-sm font-medium">
+            Target
+            <BbCombobox TValue="string" Options="@_targetNodeOptions" Value="@(Document.TargetRouteNode?.Node.Id.ToString() ?? string.Empty)" ValueChanged="SetTargetRouteNode" Placeholder="Select target" SearchPlaceholder="Search node type or ID" EmptyMessage="No eligible target nodes." MatchTriggerWidth="true" Class="mt-2 w-full" />
+        </label>
+    </div>
+
+    <div class="space-y-2">
+        <label class="block text-sm font-medium" for="route-node-search">Add constraints</label>
+        <BbInput Id="route-node-search" Type="InputType.Search" Placeholder="Search node type or ID" Value="@_nodeSearch" ValueChanged="UpdateNodeSearch" UpdateTiming="UpdateTiming.Immediate" Class="w-full" />
+        @if (string.IsNullOrWhiteSpace(_nodeSearch))
         {
-            <div class="results-heading"><span>RESULTS</span><span>@Document.Routes.Count found</span></div>
-            @for (var i = 0; i < Document.Routes.Count; i++)
-            {
-                var index = i; var route = Document.Routes[i];
-                <button class="route-result @(Document.SelectedRouteIndex == i ? "active" : "")" @onclick="() => Document.SelectRouteCommand.Execute(index)">
-                    <span class="route-number">@(i + 1)</span><span class="route-path"><strong>@route.Description</strong><small>@route.Links.Count links</small></span><strong class="route-length">@route.Length.ToString("0.##")<small>km</small></strong>
-                </button>
-            }
+            <p class="text-xs text-muted-foreground">Search to add a must or avoid node.</p>
+        }
+        else
+        {
+            <div class="max-h-48 overflow-auto rounded-md border" aria-label="Matching nodes">
+                <Virtualize Items="_matchingNodes" Context="item" ItemSize="42">
+                    <ItemContent>
+                        <div @key="item.Node.Id" class="flex items-center justify-between gap-2 border-b p-2">
+                            <span class="min-w-0">
+                                <strong class="block text-sm">@item.Node.Type</strong>
+                                <small class="block truncate text-xs text-muted-foreground" title="@item.Id">@item.Id</small>
+                            </span>
+                            <BbSelect TValue="string" Value="@NodeConstraint(item)" ValueChanged="value => SetNodeConstraint(item, value)" Class="w-24">
+                                <BbSelectTrigger class="w-full" aria-label="@($"Constraint for {NodeOption(item)}")">
+                                    <BbSelectValue />
+                                </BbSelectTrigger>
+                                <BbSelectContent>
+                                    <BbSelectItem TValue="string" Value="@("none")" Text="None" />
+                                    <BbSelectItem TValue="string" Value="@("must")" Text="Must" />
+                                    <BbSelectItem TValue="string" Value="@("avoid")" Text="Avoid" />
+                                </BbSelectContent>
+                            </BbSelect>
+                        </div>
+                    </ItemContent>
+                    <EmptyContent>
+                        <p class="p-3 text-sm text-muted-foreground">No matching nodes.</p>
+                    </EmptyContent>
+                </Virtualize>
+            </div>
         }
     </div>
-</section>
+
+    <div class="space-y-2">
+        <h3 class="text-sm font-medium">Active constraints</h3>
+        @if (Document.RequiredRouteNodes.Count + Document.AvoidedRouteNodes.Count == 0)
+        {
+            <p class="text-xs text-muted-foreground">No route constraints set.</p>
+        }
+        else
+        {
+            <div class="space-y-2">
+                @foreach (var item in Document.RequiredRouteNodes)
+                {
+                    <div @key="item.Node.Id" class="flex items-center gap-2">
+                        <BbBadge Variant="BadgeVariant.Default">Must</BbBadge>
+                        <span class="min-w-0 flex-1 truncate text-sm" title="@item.Node.Id">@NodeOption(item)</span>
+                        <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.IconSmall" AriaLabel="@($"Clear required constraint for {NodeOption(item)}")" OnClick="() => Document.SetMustNode(item, false)">
+                            <LucideIcon Name="x" Size="16" />
+                        </BbButton>
+                    </div>
+                }
+                @foreach (var item in Document.AvoidedRouteNodes)
+                {
+                    <div @key="item.Node.Id" class="flex items-center gap-2">
+                        <BbBadge Variant="BadgeVariant.Secondary">Avoid</BbBadge>
+                        <span class="min-w-0 flex-1 truncate text-sm" title="@item.Node.Id">@NodeOption(item)</span>
+                        <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.IconSmall" AriaLabel="@($"Clear avoided constraint for {NodeOption(item)}")" OnClick="() => Document.SetAvoidNode(item, false)">
+                            <LucideIcon Name="x" Size="16" />
+                        </BbButton>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+
+    <div class="flex items-end gap-3">
+        <label class="min-w-0 flex-1 text-sm font-medium" for="route-count">
+            K shortest
+            <BbNumericInput TValue="int" Id="route-count" @bind-Value="_routeCount" Min="1" Max="20" DisableDebounce="true" Disabled="@(Document.RequiredRouteNodes.Count > 0)" Class="mt-2 w-full" />
+        </label>
+        <BbButton Disabled="@Document.IsRouting" Loading="@Document.IsRouting" OnClick="RunSearch">Find route(s)</BbButton>
+    </div>
+    @if (Document.RequiredRouteNodes.Count > 0)
+    {
+        <p class="text-xs text-muted-foreground">Required nodes are visited in nearest-first order. K is inactive.</p>
+    }
+    @if (Document.IsRouting)
+    {
+        <div class="flex items-center gap-2 text-sm text-muted-foreground"><BbSpinner Size="SpinnerSize.Small" /> Searching routes…</div>
+    }
+    @if (Document.RouteError is { } error)
+    {
+        <BbAlert Variant="AlertVariant.Danger">
+            <BbAlertTitle>Route search failed</BbAlertTitle>
+            <BbAlertDescription>@error</BbAlertDescription>
+        </BbAlert>
+    }
+    @if (Document.Routes.Count > 0)
+    {
+        <div class="space-y-2">
+            <div class="flex items-center justify-between text-sm font-medium">
+                <span>Results</span>
+                <span class="text-muted-foreground">@Document.Routes.Count found</span>
+            </div>
+            @for (var i = 0; i < Document.Routes.Count; i++)
+            {
+                var index = i;
+                var route = Document.Routes[i];
+                <BbButton Variant="@(Document.SelectedRouteIndex == i ? ButtonVariant.Secondary : ButtonVariant.Outline)" Class="w-full justify-between text-left" OnClick="() => Document.SelectRouteCommand.Execute(index)">
+                    <span class="min-w-0 truncate">@(i + 1). @route.Description · @route.Links.Count links</span>
+                    <strong class="whitespace-nowrap">@route.Length.ToString("0.##") km</strong>
+                </BbButton>
+            }
+        </div>
+    }
+</div>
 
 @code {
     [Parameter, EditorRequired] public NetworkEditorViewModel Document { get; set; } = null!;
-    [Parameter] public bool IsExpanded { get; set; }
-    [Parameter] public EventCallback<bool> ExpandedChanged { get; set; }
 
     private int _routeCount = 3;
     private string _nodeSearch = "";
     private List<NodeViewModel> _matchingNodes = [];
     private NetworkEditorViewModel? _subscribedDocument;
-
-    private Task ToggleExpanded() => ExpandedChanged.InvokeAsync(!IsExpanded);
+    private IReadOnlyList<SelectOption<string>> _sourceNodeOptions = [];
+    private IReadOnlyList<SelectOption<string>> _targetNodeOptions = [];
+    private bool _renderQueued;
+    private bool _refreshNodeOptions;
+    private bool _refreshMatchingNodes;
 
     protected override void OnParametersSet()
     {
@@ -100,31 +145,79 @@
         if (_subscribedDocument is not null) _subscribedDocument.PropertyChanged -= DocumentChanged;
         _subscribedDocument = Document;
         _subscribedDocument.PropertyChanged += DocumentChanged;
+        RefreshNodeOptions();
         RefreshMatchingNodes();
     }
 
-    private void DocumentChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e) =>
-        _ = InvokeAsync(() =>
+    private void DocumentChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(NetworkEditorViewModel.Nodes)
+            or nameof(NetworkEditorViewModel.SourceRouteNode)
+            or nameof(NetworkEditorViewModel.TargetRouteNode)
+            or nameof(NetworkEditorViewModel.SourceRouteNodeOptions)
+            or nameof(NetworkEditorViewModel.TargetRouteNodeOptions)
+            or nameof(NetworkEditorViewModel.RouteConstraintNodeOptions))
         {
-            if (e.PropertyName is nameof(NetworkEditorViewModel.Nodes)
-                or nameof(NetworkEditorViewModel.SourceRouteNode)
-                or nameof(NetworkEditorViewModel.TargetRouteNode)
-                or nameof(NetworkEditorViewModel.RouteConstraintNodeOptions))
-                RefreshMatchingNodes();
-            StateHasChanged();
-        });
+            _refreshNodeOptions = true;
+            _refreshMatchingNodes = true;
+        }
+        else if (e.PropertyName is not (nameof(NetworkEditorViewModel.RequiredRouteNodes)
+            or nameof(NetworkEditorViewModel.AvoidedRouteNodes)
+            or nameof(NetworkEditorViewModel.Routes)
+            or nameof(NetworkEditorViewModel.SelectedRouteIndex)
+            or nameof(NetworkEditorViewModel.RouteError)
+            or nameof(NetworkEditorViewModel.IsRouting)))
+        {
+            return;
+        }
+
+        if (_renderQueued)
+            return;
+
+        _renderQueued = true;
+        _ = InvokeAsync(FlushDocumentChanges);
+    }
+
+    private async Task FlushDocumentChanges()
+    {
+        await Task.Yield();
+
+        if (_refreshNodeOptions)
+        {
+            _refreshNodeOptions = false;
+            RefreshNodeOptions();
+        }
+        if (_refreshMatchingNodes)
+        {
+            _refreshMatchingNodes = false;
+            RefreshMatchingNodes();
+        }
+
+        _renderQueued = false;
+        StateHasChanged();
+    }
+
+    private void RefreshNodeOptions()
+    {
+        _sourceNodeOptions = BuildNodeOptions(Document.SourceRouteNodeOptions, "Select source");
+        _targetNodeOptions = BuildNodeOptions(Document.TargetRouteNodeOptions, "Select target");
+    }
+
+    private static IReadOnlyList<SelectOption<string>> BuildNodeOptions(IEnumerable<NodeViewModel> nodes, string placeholder) =>
+        new[] { new SelectOption<string>(string.Empty, placeholder) }
+            .Concat(nodes.Select(item => new SelectOption<string>(item.Node.Id.ToString(), NodeOption(item))))
+            .ToArray();
 
     public void Dispose()
     {
         if (_subscribedDocument is not null) _subscribedDocument.PropertyChanged -= DocumentChanged;
     }
 
-    private static string NodeOption(NodeViewModel item) => string.Concat(item.Node.Type, " · ", item.Node.Id.ToString()[..5]);
-    private static string NodeOptionFull(NodeViewModel item) => string.Concat(item.Node.Type, " · ", item.Node.Id);
+    private static string NodeOption(NodeViewModel item) => string.Concat(item.Node.Type, " · ", item.Id);
 
-    private void UpdateNodeSearch(ChangeEventArgs e)
+    private void UpdateNodeSearch(string? value)
     {
-        _nodeSearch = e.Value?.ToString() ?? "";
+        _nodeSearch = value ?? "";
         RefreshMatchingNodes();
     }
 
@@ -138,11 +231,8 @@
                 || item.Node.Id.ToString().Contains(query, StringComparison.OrdinalIgnoreCase)).ToList();
     }
 
-    private void SetSourceRouteNode(ChangeEventArgs e) =>
-        Document.SetSourceRouteNode(FindNode(e.Value?.ToString()));
-
-    private void SetTargetRouteNode(ChangeEventArgs e) =>
-        Document.SetTargetNode(FindNode(e.Value?.ToString()));
+    private void SetSourceRouteNode(string? id) => Document.SetSourceRouteNode(FindNode(id));
+    private void SetTargetRouteNode(string? id) => Document.SetTargetNode(FindNode(id));
 
     private NodeViewModel? FindNode(string? id) => Guid.TryParse(id, out var nodeId)
         ? Document.Nodes.FirstOrDefault(item => item.Node.Id == nodeId)

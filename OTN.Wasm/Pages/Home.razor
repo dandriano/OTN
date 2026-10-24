@@ -3,51 +3,60 @@
 @inject NetworkEditorViewModel Document
 
 <PageTitle>OTN Demo</PageTitle>
-<main class="editor-shell">
-    <header class="topbar">
-        <div class="brand"><span class="brand-mark">O</span><div><strong>OTN</strong><small>Optical transport network demo</small></div></div>
-        <div class="top-actions"><button class="icon-button" @onclick="ZoomOut">−</button><span>@((int)(_zoom * 100))%</span><button class="icon-button" @onclick="ZoomIn">+</button><button class="icon-button" @onclick="ResetView">⌂</button></div>
+<main class="app-shell">
+    <header class="app-header flex items-center gap-3 border-b px-4">
+            <LucideIcon Name="network" Size="24" />
+        <div>
+            <strong class="block text-base">OTN</strong>
+            <span class="brand-caption text-sm text-muted-foreground">Optical transport network demo</span>
+        </div>
+        <div class="ml-auto flex items-center gap-2">
+            <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.IconSmall" AriaLabel="Zoom out" OnClick="() => ZoomOut()">
+                <LucideIcon Name="minus" Size="16" />
+            </BbButton>
+            <span class="min-w-12 text-center text-sm tabular-nums">@((int)(_zoom * 100))%</span>
+            <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.IconSmall" AriaLabel="Zoom in" OnClick="() => ZoomIn()">
+                <LucideIcon Name="plus" Size="16" />
+            </BbButton>
+            <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.IconSmall" AriaLabel="Reset view" OnClick="() => ResetView()">
+                <LucideIcon Name="house" Size="16" />
+            </BbButton>
+        </div>
     </header>
     <div class="workspace">
         <NetworkCanvas @ref="_networkCanvas" Document="Document" Zoom="_zoom" ZoomChanged="SetZoom" />
-        <aside class="side-panel">
-            <PropertiesInspector Document="Document" IsExpanded="@(_expandedSection == SidebarSection.Inspector)" ExpandedChanged="SetInspectorExpanded" />
-            <RouteFinder Document="Document" IsExpanded="@(_expandedSection == SidebarSection.RouteFinder)" ExpandedChanged="SetRouteFinderExpanded" />
+        <aside class="side-panel bg-background">
+            <BbAccordion Type="AccordionType.Single" Collapsible="true" DefaultValue="@_defaultOpenSections">
+                <BbAccordionItem Value="inspector">
+                    <div class="px-4 pt-4">
+                        <BbAccordionTrigger Class="text-xs font-medium uppercase tracking-wider text-muted-foreground">Inspector</BbAccordionTrigger>
+                    </div>
+                    <BbAccordionContent Class="px-4 pb-5">
+                        <PropertiesInspector Document="Document" />
+                    </BbAccordionContent>
+                </BbAccordionItem>
+                <BbAccordionItem Value="route-finder">
+                    <div class="px-4 pt-4">
+                        <BbAccordionTrigger Class="text-xs font-medium uppercase tracking-wider text-muted-foreground">Route finder</BbAccordionTrigger>
+                    </div>
+                    <BbAccordionContent Class="px-4 pb-5">
+                        <RouteFinder Document="Document" />
+                    </BbAccordionContent>
+                </BbAccordionItem>
+            </BbAccordion>
         </aside>
     </div>
 </main>
 
 @code {
-    private enum SidebarSection { Inspector, RouteFinder }
-
+    private readonly HashSet<string> _defaultOpenSections = ["inspector"];
     private double _zoom = 1;
     private NetworkCanvas? _networkCanvas;
-    private SidebarSection? _expandedSection = SidebarSection.Inspector;
 
     protected override void OnInitialized() => Document.PropertyChanged += DocumentChanged;
 
     private void DocumentChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e) =>
         _ = InvokeAsync(StateHasChanged);
-
-    private Task SetInspectorExpanded(bool expanded)
-    {
-        if (expanded)
-            _expandedSection = SidebarSection.Inspector;
-        else if (_expandedSection == SidebarSection.Inspector)
-            _expandedSection = null;
-
-        return Task.CompletedTask;
-    }
-
-    private Task SetRouteFinderExpanded(bool expanded)
-    {
-        if (expanded)
-            _expandedSection = SidebarSection.RouteFinder;
-        else if (_expandedSection == SidebarSection.RouteFinder)
-            _expandedSection = null;
-
-        return Task.CompletedTask;
-    }
 
     public void Dispose() => Document.PropertyChanged -= DocumentChanged;
 
@@ -59,6 +68,7 @@
 
     private void ZoomIn() => _zoom = Math.Min(2.8, _zoom * 1.15);
     private void ZoomOut() => _zoom = Math.Max(0.35, _zoom / 1.15);
+
     private void ResetView()
     {
         _zoom = 1;

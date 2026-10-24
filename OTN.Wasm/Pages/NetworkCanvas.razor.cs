@@ -64,10 +64,6 @@ public partial class NetworkCanvas : ComponentBase, IDisposable
     }
 
     private NodeViewModel NodeFor(NetNode node) => Document.Nodes.First(item => ReferenceEquals(item.Node, node));
-    private string ActiveMode(EditorMode mode) => _mode == mode ? "active" : "";
-    private string ActiveCreation(CreationMode mode) => _creationMode == mode ? "active" : "";
-    private string ActiveNodeType(NetNodeType type) => _newNodeType == type ? "active" : "";
-    private string ActiveLinkType(LinkType type) => _newLinkType == type ? "active" : "";
     private bool IsHighlighted(Link link) => _highlightedLinks.Contains(link);
 
     private void SetNewNodeType(NetNodeType type) => _newNodeType = type;
@@ -210,7 +206,7 @@ public partial class NetworkCanvas : ComponentBase, IDisposable
         context.FillStyle = "#314156";
         context.Font = "700 10px sans-serif";
         context.TextAlign = TextAlign.Center;
-        context.FillText(item.Node.Id.ToString()[..5], (float)item.X, (float)item.Y - 23);
+        context.FillText(item.Id, (float)item.X, (float)item.Y - 23);
     }
 
     private static void DrawNodeBadge(IRenderContext context, string fill)

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-base-color="zinc" data-primary-color="blue">
 
 <head>
     <meta charset="utf-8" />
@@ -7,6 +7,8 @@
     <title>OTN Demo</title>
     <base href="/" />
     <link rel="stylesheet" href="css/app.css" />
+    <link rel="stylesheet" href="_content/BlazorBlueprint.Components/css/themes.css" />
+    <link rel="stylesheet" href="_content/BlazorBlueprint.Components/blazorblueprint.css" />
     <link rel="stylesheet" href="_content/Blazorex/blazorex.css" />
     <link rel="icon" type="image/png" href="favicon.png" />
     <link href="OTN.Wasm.styles.css" rel="stylesheet" />
@@ -14,12 +16,7 @@
 
 <body>
     <div id="app">
-        <main class="startup-screen">
-            <div class="startup-card">
-                <p class="startup-loading-label">Loading...</p>
-                <div class="loading-progress-text" role="status" aria-live="polite" aria-label="Application download progress"></div>
-            </div>
-        </main>
+        <p role="status">Loading…</p>
     </div>
 
     <div id="blazor-error-ui">

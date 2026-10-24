@@ -1,39 +1,114 @@
-<section class="panel-section">
-    <div class="section-heading">
-        <div>
-            <span class="eyebrow">PROPERTIES</span>
-            <h2><button type="button" class="section-toggle" aria-expanded="@IsExpanded" aria-controls="inspector-content" @onclick="ToggleExpanded">Inspector<span class="section-chevron" aria-hidden="true">⌄</span></button></h2>
+@implements IDisposable
+
+@if (Document.SelectedNode is { } selectedNode)
+{
+    <div class="mb-4 flex items-center gap-3 rounded-md border p-3">
+        <span style="width:30px;height:30px;flex:0 0 30px;display:grid;place-items:center;border-radius:8px;background:@IconBackground(selectedNode.Node.Type);color:@IconColor(selectedNode.Node.Type)">
+            <EditorObjectIcon NodeType="selectedNode.Node.Type" Size="22" />
+        </span>
+        <div class="min-w-0">
+            <strong class="block text-sm">Network node</strong>
+            <span class="block truncate text-xs text-muted-foreground">@selectedNode.Id</span>
         </div>
     </div>
-    <div id="inspector-content" hidden="@(!IsExpanded)">
-        @if (Document.SelectedNode is { } selectedNode)
-        {
-            <div class="selected-kind"><span class="kind-icon @NodeClass(selectedNode.Node.Type)"><EditorObjectIcon NodeType="selectedNode.Node.Type" /></span><div><strong>Network node</strong><small>@selectedNode.Node.Id</small></div></div>
-            <label class="field-label">Node type</label><select class="field" value="@selectedNode.Node.Type" @onchange="e => ChangeNodeType(selectedNode, e.Value?.ToString())"><option>Terminal</option><option>OLA</option><option>ROADM</option></select>
-            <div class="readonly-row"><span>Canvas position</span><strong>@selectedNode.X.ToString("0"), @selectedNode.Y.ToString("0")</strong></div>
-        }
-        else if (Document.SelectedLink is { } selectedLink)
-        {
-            <div class="selected-kind"><span class="kind-icon link-kind"><EditorObjectIcon LinkDirection="selectedLink.Link.LinkType" /></span><div><strong>Optical link</strong><small>@selectedLink.Link.Id</small></div></div>
-            <label class="field-label">Length (km)</label><input class="field" type="number" min="0" step="0.1" @bind="_linkWeight" />
-            <label class="field-label">Link mode</label><select class="field" @bind="_linkMode"><option value="Simplex">Simplex</option><option value="Duplex">Duplex</option></select>
-            <button class="primary-button full-width" @onclick="() => UpdateSelectedLink(selectedLink)">Apply changes</button>
-        }
-        else { <div class="inspector-empty"><span>⌖</span><p>Select a node or link to inspect its properties.</p></div> }
+    <label class="mb-2 block text-sm font-medium">
+        Node type
+        <BbSelect @key="selectedNode.Node.Id" TValue="string" Value="@SelectedNodeType" ValueChanged="SetSelectedNodeType" Class="mt-2 w-full">
+            <BbSelectTrigger class="w-full" aria-label="Node type">
+                <BbSelectValue />
+            </BbSelectTrigger>
+            <BbSelectContent>
+                <BbSelectItem TValue="string" Value="@("Terminal")" Text="Terminal" />
+                <BbSelectItem TValue="string" Value="@("OLA")" Text="OLA" />
+                <BbSelectItem TValue="string" Value="@("ROADM")" Text="ROADM" />
+            </BbSelectContent>
+        </BbSelect>
+    </label>
+    <div class="mt-4 flex justify-between gap-3 text-sm text-muted-foreground">
+        <span>Canvas position</span>
+        <strong class="text-foreground">@selectedNode.X.ToString("0"), @selectedNode.Y.ToString("0")</strong>
     </div>
-</section>
+}
+else if (Document.SelectedLink is { } selectedLink)
+{
+    <div class="mb-4 flex items-center gap-3 rounded-md border p-3">
+        <span style="width:30px;height:30px;flex:0 0 30px;display:grid;place-items:center;border-radius:8px;background:#e9f1ff;color:#397fd0">
+            <EditorObjectIcon LinkDirection="selectedLink.Link.LinkType" Size="22" />
+        </span>
+        <div class="min-w-0">
+            <strong class="block text-sm">Optical link</strong>
+            <span class="block truncate text-xs text-muted-foreground">@selectedLink.Id</span>
+        </div>
+    </div>
+    <label class="mb-2 block text-sm font-medium" for="link-length">Length (km)</label>
+    <BbInput Id="link-length" Type="InputType.Number" @bind-Value="_linkWeight" Class="w-full" min="0" step="0.1" />
+    <label class="mb-2 mt-4 block text-sm font-medium">
+        Link mode
+        <BbSelect TValue="string" Value="@_linkMode.ToString()" ValueChanged="SetLinkMode" Class="mt-2 w-full">
+            <BbSelectTrigger class="w-full" aria-label="Link mode">
+                <BbSelectValue />
+            </BbSelectTrigger>
+            <BbSelectContent>
+                <BbSelectItem TValue="string" Value="@("Simplex")" Text="Simplex" />
+                <BbSelectItem TValue="string" Value="@("Duplex")" Text="Duplex" />
+            </BbSelectContent>
+        </BbSelect>
+    </label>
+    <BbButton Class="mt-4 w-full" OnClick="() => UpdateSelectedLink(selectedLink)">Apply changes</BbButton>
+}
+else
+{
+    <div class="flex min-h-32 flex-col items-center justify-center gap-2 text-center text-sm text-muted-foreground">
+        <LucideIcon Name="mouse-pointer-2" Size="24" />
+        <p>Select a node or link to inspect its properties.</p>
+    </div>
+}
 
 @code {
     [Parameter, EditorRequired] public NetworkEditorViewModel Document { get; set; } = null!;
-    [Parameter] public bool IsExpanded { get; set; }
-    [Parameter] public EventCallback<bool> ExpandedChanged { get; set; }
 
     private LinkViewModel? _inspectedLink;
+    private NetworkEditorViewModel? _subscribedDocument;
     private string _linkWeight = "100";
     private LinkType _linkMode = LinkType.Duplex;
-    private Task ToggleExpanded() => ExpandedChanged.InvokeAsync(!IsExpanded);
+    private string SelectedNodeType
+    {
+        get => Document.SelectedNode?.Node.Type.ToString() ?? string.Empty;
+        set
+        {
+            if (Document.SelectedNode is { } node)
+                ChangeNodeType(node, value);
+        }
+    }
+
+    protected override void OnInitialized() => SubscribeToDocument();
 
     protected override void OnParametersSet()
+    {
+        SubscribeToDocument();
+        SyncSelectedLink();
+    }
+
+    private void SubscribeToDocument()
+    {
+        if (ReferenceEquals(_subscribedDocument, Document))
+            return;
+
+        if (_subscribedDocument is not null)
+            _subscribedDocument.PropertyChanged -= DocumentChanged;
+
+        _subscribedDocument = Document;
+        _subscribedDocument.PropertyChanged += DocumentChanged;
+    }
+
+    private void DocumentChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e) =>
+        _ = InvokeAsync(() =>
+        {
+            SyncSelectedLink();
+            StateHasChanged();
+        });
+
+    private void SyncSelectedLink()
     {
         var selectedLink = Document.SelectedLink;
         if (selectedLink is null)
@@ -41,7 +116,7 @@
             _inspectedLink = null;
             return;
         }
-        if (ReferenceEquals(selectedLink, _inspectedLink)) 
+        if (ReferenceEquals(selectedLink, _inspectedLink))
             return;
 
         _inspectedLink = selectedLink;
@@ -49,12 +124,40 @@
         _linkMode = selectedLink.Link.LinkType;
     }
 
-    private static string NodeClass(NetNodeType type) => type.ToString().ToLowerInvariant();
-    private void ChangeNodeType(NodeViewModel node, string? value) 
-    { 
-        if (Enum.TryParse<NetNodeType>(value, out var type)) 
-            Document.SetNodeType(node, type); 
+    public void Dispose()
+    {
+        if (_subscribedDocument is not null)
+            _subscribedDocument.PropertyChanged -= DocumentChanged;
     }
+
+    private static string IconBackground(NetNodeType type) => type switch
+    {
+        NetNodeType.Terminal => "#e4f4f1",
+        NetNodeType.OLA => "#fff0df",
+        _ => "#e9edfb"
+    };
+
+    private static string IconColor(NetNodeType type) => type switch
+    {
+        NetNodeType.Terminal => "#40988d",
+        NetNodeType.OLA => "#d58a3d",
+        _ => "#617dc8"
+    };
+
+    private void ChangeNodeType(NodeViewModel node, string? value)
+    {
+        if (Enum.TryParse<NetNodeType>(value, out var type))
+            Document.SetNodeType(node, type);
+    }
+
+    private void SetSelectedNodeType(string? value) => SelectedNodeType = value ?? string.Empty;
+
+    private void SetLinkMode(string? value)
+    {
+        if (Enum.TryParse<LinkType>(value, out var mode))
+            _linkMode = mode;
+    }
+
     private void UpdateSelectedLink(LinkViewModel link)
     {
         if (double.TryParse(_linkWeight, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var weight))

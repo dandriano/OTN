@@ -1,36 +1,48 @@
 <section class="canvas-area">
-    <div class="toolbar">
-        <div class="tool-group">
-            <button class="tool-button @ActiveMode(EditorMode.Select)" @onclick="() => SetMode(EditorMode.Select)">↖ Select</button>
-            <button class="tool-button @ActiveMode(EditorMode.Edit)" @onclick="() => SetMode(EditorMode.Edit)">✎ Edit</button>
+    <div class="canvas-toolbar flex flex-wrap items-center gap-2 border-b px-3 py-2">
+        <div class="flex flex-wrap items-center gap-1" role="group" aria-label="Editor mode">
+            <BbButton Variant="@(_mode == EditorMode.Select ? ButtonVariant.Default : ButtonVariant.Outline)" Size="ButtonSize.Small" aria-pressed="@(_mode == EditorMode.Select)" OnClick="() => SetMode(EditorMode.Select)">
+                <LucideIcon Name="mouse-pointer-2" Size="16" /> Select
+            </BbButton>
+            <BbButton Variant="@(_mode == EditorMode.Edit ? ButtonVariant.Default : ButtonVariant.Outline)" Size="ButtonSize.Small" aria-pressed="@(_mode == EditorMode.Edit)" OnClick="() => SetMode(EditorMode.Edit)">
+                <LucideIcon Name="pencil" Size="16" /> Edit
+            </BbButton>
         </div>
         @if (_mode == EditorMode.Edit)
         {
-            <div class="tool-group creation-tools" aria-label="Edit tool">
-                <button class="tool-button @ActiveCreation(CreationMode.Node)" @onclick="() => SetCreationMode(CreationMode.Node)">＋ Node</button>
-                <button class="tool-button @ActiveCreation(CreationMode.Link)" @onclick="() => SetCreationMode(CreationMode.Link)">＋ Link</button>
+            <div class="flex flex-wrap items-center gap-1 border-l pl-2" role="group" aria-label="Edit tool">
+                <BbButton Variant="@(_creationMode == CreationMode.Node ? ButtonVariant.Default : ButtonVariant.Outline)" Size="ButtonSize.Small" aria-pressed="@(_creationMode == CreationMode.Node)" OnClick="() => SetCreationMode(CreationMode.Node)">
+                    <LucideIcon Name="plus" Size="16" /> Node
+                </BbButton>
+                <BbButton Variant="@(_creationMode == CreationMode.Link ? ButtonVariant.Default : ButtonVariant.Outline)" Size="ButtonSize.Small" aria-pressed="@(_creationMode == CreationMode.Link)" OnClick="() => SetCreationMode(CreationMode.Link)">
+                    <LucideIcon Name="link-2" Size="16" /> Link
+                </BbButton>
             </div>
             @if (_creationMode == CreationMode.Node)
             {
-                <div class="tool-group choice-group" role="group" aria-label="Node type">
-                    <button type="button" class="tool-button choice-button @ActiveNodeType(NetNodeType.Terminal)" aria-label="Terminal" aria-pressed="@(_newNodeType == NetNodeType.Terminal)" title="Terminal" @onclick="() => SetNewNodeType(NetNodeType.Terminal)"><EditorObjectIcon NodeType="NetNodeType.Terminal" /><span class="choice-label">Terminal</span></button>
-                    <button type="button" class="tool-button choice-button @ActiveNodeType(NetNodeType.OLA)" aria-label="OLA" aria-pressed="@(_newNodeType == NetNodeType.OLA)" title="OLA" @onclick="() => SetNewNodeType(NetNodeType.OLA)"><EditorObjectIcon NodeType="NetNodeType.OLA" /><span class="choice-label">OLA</span></button>
-                    <button type="button" class="tool-button choice-button @ActiveNodeType(NetNodeType.ROADM)" aria-label="ROADM" aria-pressed="@(_newNodeType == NetNodeType.ROADM)" title="ROADM" @onclick="() => SetNewNodeType(NetNodeType.ROADM)"><EditorObjectIcon NodeType="NetNodeType.ROADM" /><span class="choice-label">ROADM</span></button>
+                <div class="flex flex-wrap items-center gap-1" role="group" aria-label="Node type">
+                    <BbButton Variant="@(_newNodeType == NetNodeType.Terminal ? ButtonVariant.Secondary : ButtonVariant.Ghost)" Size="ButtonSize.Small" aria-pressed="@(_newNodeType == NetNodeType.Terminal)" OnClick="() => SetNewNodeType(NetNodeType.Terminal)"><EditorObjectIcon NodeType="NetNodeType.Terminal" /> Terminal</BbButton>
+                    <BbButton Variant="@(_newNodeType == NetNodeType.OLA ? ButtonVariant.Secondary : ButtonVariant.Ghost)" Size="ButtonSize.Small" aria-pressed="@(_newNodeType == NetNodeType.OLA)" OnClick="() => SetNewNodeType(NetNodeType.OLA)"><EditorObjectIcon NodeType="NetNodeType.OLA" /> OLA</BbButton>
+                    <BbButton Variant="@(_newNodeType == NetNodeType.ROADM ? ButtonVariant.Secondary : ButtonVariant.Ghost)" Size="ButtonSize.Small" aria-pressed="@(_newNodeType == NetNodeType.ROADM)" OnClick="() => SetNewNodeType(NetNodeType.ROADM)"><EditorObjectIcon NodeType="NetNodeType.ROADM" /> ROADM</BbButton>
                 </div>
-                <span class="mode-hint">Click the canvas to place nodes</span>
+                <span class="ml-auto text-xs text-muted-foreground">Click the canvas to place nodes</span>
             }
             else
             {
-                <div class="tool-group choice-group" role="group" aria-label="Link mode">
-                    <button type="button" class="tool-button choice-button @ActiveLinkType(LinkType.Duplex)" aria-label="Duplex" aria-pressed="@(_newLinkType == LinkType.Duplex)" title="Duplex" @onclick="() => SetNewLinkType(LinkType.Duplex)"><EditorObjectIcon LinkDirection="LinkType.Duplex" /><span class="choice-label">Duplex</span></button>
-                    <button type="button" class="tool-button choice-button @ActiveLinkType(LinkType.Simplex)" aria-label="Simplex" aria-pressed="@(_newLinkType == LinkType.Simplex)" title="Simplex" @onclick="() => SetNewLinkType(LinkType.Simplex)"><EditorObjectIcon LinkDirection="LinkType.Simplex" /><span class="choice-label">Simplex</span></button>
+                <div class="flex flex-wrap items-center gap-1" role="group" aria-label="Link mode">
+                    <BbButton Variant="@(_newLinkType == LinkType.Duplex ? ButtonVariant.Secondary : ButtonVariant.Ghost)" Size="ButtonSize.Small" aria-pressed="@(_newLinkType == LinkType.Duplex)" OnClick="() => SetNewLinkType(LinkType.Duplex)"><EditorObjectIcon LinkDirection="LinkType.Duplex" Size="18" /> Duplex</BbButton>
+                    <BbButton Variant="@(_newLinkType == LinkType.Simplex ? ButtonVariant.Secondary : ButtonVariant.Ghost)" Size="ButtonSize.Small" aria-pressed="@(_newLinkType == LinkType.Simplex)" OnClick="() => SetNewLinkType(LinkType.Simplex)"><EditorObjectIcon LinkDirection="LinkType.Simplex" Size="18" /> Simplex</BbButton>
                 </div>
-                <span class="mode-hint">@(Document.PendingLinkSource is null ? "Select a source node" : "Select a target node · Escape to cancel")</span>
+                <span class="ml-auto text-xs text-muted-foreground">@(Document.PendingLinkSource is null ? "Select a source node" : "Select a target node · Escape to cancel")</span>
             }
         }
     </div>
-    <div class="canvas-surface" @onpointerdown="CanvasPointerDown" @onpointermove="CanvasPointerMove" @onpointerup="CanvasPointerUp" @onpointerleave="CanvasPointerLeave" @onwheel="Wheel" @onwheel:preventDefault="true" @onkeydown="CanvasKeyDown" tabindex="0">
+    <div class="canvas-surface cursor-crosshair select-none" @onpointerdown="CanvasPointerDown" @onpointermove="CanvasPointerMove" @onpointerup="CanvasPointerUp" @onpointerleave="CanvasPointerLeave" @onwheel="Wheel" @onwheel:preventDefault="true" @onkeydown="CanvasKeyDown" tabindex="0">
         <Canvas Width="1000" Height="680" OnCanvasReady="CanvasReady" OnFrameReady="DrawFrame" />
     </div>
-    <footer class="canvas-footer"><span><kbd>Shift</kbd> + click requires · <kbd>Alt</kbd> + click avoids</span><span>Scroll to zoom · drag canvas to pan</span><span class="status-dot">● Ready</span></footer>
+    <footer class="canvas-footer flex items-center gap-4 border-t px-3 py-2 text-xs text-muted-foreground">
+        <span><BbKbd>Shift</BbKbd> + click requires · <BbKbd>Alt</BbKbd> + click avoids</span>
+        <span>Scroll to zoom · drag canvas to pan</span>
+        <span class="ml-auto">● Ready</span>
+    </footer>
 </section>
